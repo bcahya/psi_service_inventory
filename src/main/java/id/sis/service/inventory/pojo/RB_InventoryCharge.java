@@ -5,6 +5,7 @@ import java.util.List;
 public class RB_InventoryCharge {
 	Integer m_inventory_id;
 	List<RB_InventoryChargeDetail> list_detail;
+	List<RB_InventoryChargeBOM> list_bom;
 	
 	public Integer getM_inventory_id() {
 		return m_inventory_id;
@@ -18,4 +19,11 @@ public class RB_InventoryCharge {
 	public void setList_detail(List<RB_InventoryChargeDetail> list_detail) {
 		this.list_detail = list_detail;
 	}
+	public List<RB_InventoryChargeBOM> getList_bom() {
+		return list_bom;
+	}
+	public void setList_bom(List<RB_InventoryChargeBOM> list_bom) {
+		this.list_bom = list_bom;
+	}
+	
 }

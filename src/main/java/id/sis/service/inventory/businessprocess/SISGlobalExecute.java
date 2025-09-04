@@ -17,6 +17,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import id.sis.service.inventory.pojo.RB_InventoryCharge;
+import id.sis.service.inventory.pojo.RB_InventoryChargeBOM;
+import id.sis.service.inventory.pojo.RB_InventoryChargeBOMMaterial;
 import id.sis.service.inventory.pojo.RB_InventoryChargeDetail;
 import id.sis.service.inventory.properties.SISIdProperties;
 import id.sis.service.inventory.response.SISResponse;
@@ -370,13 +372,38 @@ public class SISGlobalExecute {
 						mapSC.put("price", pd.getPrice());
 						listSC.add(mapSC);
 					}
+				} else if (type.equalsIgnoreCase("3")) {
+					List<RB_InventoryChargeDetail> listPD = mapType.get(type);
+					BigDecimal totalMaterial = new BigDecimal(0);
+					for (int a=0; a<listPD.size(); a++) {
+						RB_InventoryChargeDetail pd = listPD.get(a);
+						if (!pd.isIs_kemas()) {
+							totalMaterial = totalMaterial.add(pd.getQty().multiply(pd.getPrice()));
+						} else {
+							for (RB_InventoryChargeBOM cb: param.getList_bom()) {
+								if (cb.getProduct_kemas_id() == pd.getM_product_id()) {
+									for (RB_InventoryChargeBOMMaterial cbm: cb.getList_material()) {
+										for(RB_InventoryChargeDetail pdm: listPD) {
+											if (pdm.getM_product_id().equals(cbm.getM_product_id())) {
+												totalMaterial = totalMaterial.add(pdm.getQty().multiply(pdm.getPrice()));
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+					Map<String, Object> mapResult = new HashMap<String, Object>();
+					mapResult.put("m_inventory_id", param.getM_inventory_id());
+					mapResult.put("amt", totalMaterial);
+					resultList.add(mapResult);
 				} else if (type.equalsIgnoreCase("4")) {
 					List<RB_InventoryChargeDetail> listPD = mapType.get(type);
 					for (int a=0; a<listPD.size(); a++) {
 						RB_InventoryChargeDetail pd = listPD.get(a);
-						if (pd.getQty().signum() < 0) {
+						if (pd.getQty().signum() < 0 && pd.isIs_dibebankan()) {
 							Map<String, Object> mapResult = new HashMap<String, Object>();
-							mapResult.put("m_inventoryline_id", pd.getM_inventoryline_id());
+							mapResult.put("m_inventory_id", param.getM_inventory_id());
 							mapResult.put("amt", pd.getQty().abs().multiply(pd.getPrice()));
 							resultList.add(mapResult);
 						}

@@ -15,8 +15,21 @@ public class RB_InventoryChargeDetail {
 	BigDecimal price;
 	BigDecimal price_netto;
 	BigDecimal percent;
+	boolean is_dibebankan;
+	boolean is_kemas;
 	
-	
+	public boolean isIs_kemas() {
+		return is_kemas;
+	}
+	public void setIs_kemas(boolean is_kemas) {
+		this.is_kemas = is_kemas;
+	}
+	public boolean isIs_dibebankan() {
+		return is_dibebankan;
+	}
+	public void setIs_dibebankan(boolean is_dibebankan) {
+		this.is_dibebankan = is_dibebankan;
+	}
 	public BigDecimal getPrice_netto() {
 		return price_netto;
 	}
