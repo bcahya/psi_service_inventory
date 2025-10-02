@@ -8,14 +8,7 @@ public class RB_MOProduct {
 	int bp_id = 0;
 	boolean is_bom = false;
 	List<Integer> list_routing = new ArrayList<>();
-	List<RB_MOProductReplenish> list_replenish = new ArrayList<RB_MOProductReplenish>();
 	
-	public List<RB_MOProductReplenish> getList_replenish() {
-		return list_replenish;
-	}
-	public void setList_replenish(List<RB_MOProductReplenish> list_replenish) {
-		this.list_replenish = list_replenish;
-	}
 	public boolean isIs_bom() {
 		return is_bom;
 	}

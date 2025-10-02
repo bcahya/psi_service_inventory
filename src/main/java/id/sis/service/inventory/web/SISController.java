@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import id.sis.service.inventory.pojo.RB_InventoryCharge;
+import id.sis.service.inventory.pojo.RB_MO;
 import id.sis.service.inventory.response.SISResponse;
 import id.sis.service.inventory.service.SISServiceImpl;
 
@@ -72,6 +73,22 @@ public class SISController {
 		return response;
 	}
 
-	
+	@ResponseBody
+	@RequestMapping(value = "/calculateRoutingMO", method = RequestMethod.POST)
+	SISResponse calculateRoutingMO(
+			@RequestBody RB_MO param
+			) {
+		SISResponse response = new SISResponse();
+
+		try {
+			response = sisService.calculateRoutingMO(
+					param
+					);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		return response;
+	}
 	
 }

@@ -15,8 +15,22 @@ public class RB_MO {
 	List<RB_MOBOM> list_bom = new ArrayList<>();
 	List<RB_MOSOH> list_soh = new ArrayList<>();
 	List<RB_MOWH> list_wh = new ArrayList<>();
+	List<RB_MOLocator> list_locator = new ArrayList<>();
 	List<RB_MOProduct> list_product = new ArrayList<>();
+	List<RB_MOProductReplenish> list_replenish = new ArrayList<>();
 	
+	public List<RB_MOProductReplenish> getList_replenish() {
+		return list_replenish;
+	}
+	public void setList_replenish(List<RB_MOProductReplenish> list_replenish) {
+		this.list_replenish = list_replenish;
+	}
+	public List<RB_MOLocator> getList_locator() {
+		return list_locator;
+	}
+	public void setList_locator(List<RB_MOLocator> list_locator) {
+		this.list_locator = list_locator;
+	}
 	public int getLocator_pre_id() {
 		return locator_pre_id;
 	}

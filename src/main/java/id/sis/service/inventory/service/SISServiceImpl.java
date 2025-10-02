@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import id.sis.service.inventory.businessprocess.SISApi;
 import id.sis.service.inventory.businessprocess.SISGlobalExecute;
 import id.sis.service.inventory.pojo.RB_InventoryCharge;
+import id.sis.service.inventory.pojo.RB_MO;
 import id.sis.service.inventory.response.SISResponse;
 import id.sis.service.inventory.utils.SISUtil;
 
@@ -33,6 +34,11 @@ public class SISServiceImpl{
 	public SISResponse calculateInventoryCharge(RB_InventoryCharge param) throws Exception {
         logger.info("execute calculateInventoryCharge");
         return ex.calculateInventoryCharge(param);
+    }
+	
+	public SISResponse calculateRoutingMO(RB_MO param) throws Exception {
+        logger.info("execute calculateRoutingMO");
+        return ex.calculateRoutingMO(param);
     }
 
 //    @Scheduled(cron = "0 */10 * * * *")

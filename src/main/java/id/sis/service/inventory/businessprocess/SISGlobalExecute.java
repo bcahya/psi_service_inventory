@@ -24,6 +24,7 @@ import id.sis.service.inventory.pojo.RB_MO;
 import id.sis.service.inventory.pojo.RB_MOBOM;
 import id.sis.service.inventory.pojo.RB_MOBOMLine;
 import id.sis.service.inventory.pojo.RB_MOProduct;
+import id.sis.service.inventory.pojo.RB_MOProductReplenish;
 import id.sis.service.inventory.pojo.RB_MORouting;
 import id.sis.service.inventory.pojo.RB_MOSOH;
 import id.sis.service.inventory.pojo.RB_MOWH;
@@ -500,6 +501,7 @@ public class SISGlobalExecute {
 			
 			calculateRouting(listMO, rbmo, bomFG, null, rbmo.getWarehouse_id(), rbmo.getLocator_pre_id(), rbmo.getLocator_post_id(), rbmo.getQty());
 			mapResult.put("list_mo", listMO);
+			resultList.add(mapResult);
 			response = SISResponse.successResponse(resultList);
 		} catch (Exception e) {
 			response = SISResponse.errorResponse(e.getMessage());
@@ -552,7 +554,7 @@ public class SISGlobalExecute {
 			
 			int locSearchID = preLocatorID;
 			int routingLineID = 0;
-			boolean isFrom = true;
+			boolean isFrom = false;
 			int counter = 0;
 			while(true) {
 				counter += 1;
@@ -560,11 +562,14 @@ public class SISGlobalExecute {
 					throw new Exception("Routing never ending loop!");
 				}
 				RB_MORouting routing = getNextRouting(listProductRouting, locSearchID, isFrom);
+				if (routing == null) {
+					continue;
+				}
 				if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)) {
 					locSearchID = routing.getLocatorto_id();
-					isFrom = false;
-				} else if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PULLFROM)) {
 					isFrom = true;
+				} else if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PULLFROM)) {
+					isFrom = false;
 					locSearchID = routing.getLocatorfrom_id();
 				}
 				if (routingLineID == routing.getRoutingline_id()) {
@@ -619,7 +624,7 @@ public class SISGlobalExecute {
 		int counter = 0;
 		List<RB_MORouting> listProductRouting = getListProductRouting(rbmo.getList_routing(),
 				rbmo.getList_product(), bom.getProduct_id());
-		boolean isFrom = false;
+		boolean isFrom = true;
 		while(true) {
 			counter += 1;
 			if (counter > 15) {
@@ -627,10 +632,10 @@ public class SISGlobalExecute {
 			}
 			RB_MORouting routing = getNextRouting(listProductRouting, locSearchID, isFrom);
 			if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)) {
-				isFrom = false;
+				isFrom = true;
 				locSearchID = routing.getLocatorto_id();
 			} else if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PULLFROM)) {
-				isFrom = true;
+				isFrom = false;
 				locSearchID = routing.getLocatorfrom_id();
 			}
 			if (routingLineID == routing.getRoutingline_id()) {
@@ -646,6 +651,21 @@ public class SISGlobalExecute {
 			}
 			if (isGenMove) {
 				generateMove(listMove, routing, bom.getProduct_id(), qty);
+			}
+		}
+		for (LinkedHashMap<String, Object> mapReq: listReq) {
+			List<LinkedHashMap<String, Object>> listReqLine = (List<LinkedHashMap<String, Object>>)mapReq.get("list_line");
+			for (LinkedHashMap<String, Object> mapReqLine: listReqLine) {
+				RB_MOProductReplenish pr = getProductReplenish(rbmo.getList_replenish(), (int)mapReqLine.get("product_id"), (int)mapReq.get("warehouse_id"));
+				if (pr != null) {
+					BigDecimal qtyRep = pr.getMin();
+					if (pr.getMax().compareTo(qtyRep) > 0) {
+						qtyRep = pr.getMax();
+					}
+					if (pr.getMin().compareTo((BigDecimal)mapReqLine.get("qty")) > 0) {
+						mapReqLine.put("qty", qtyRep);
+					}
+				}
 			}
 		}
 		listMO.add(mapMO);
@@ -702,7 +722,7 @@ public class SISGlobalExecute {
 		}
 		if (mapReq.isEmpty()) {
 			mapReq.put("bp_id", product.getBp_id());
-			mapReq.put("warehouse_id", routing.getWarehousefrom_id());
+			mapReq.put("warehouse_id", routing.getWarehouseto_id());
 			mapReq.put("list_line", new ArrayList<>());
 		}
 		LinkedHashMap<String, Object> mapLine = new LinkedHashMap<>();
@@ -802,6 +822,22 @@ public class SISGlobalExecute {
 			}
 		}
 		return p;
+	}
+	
+	RB_MOProductReplenish getProductReplenish(
+			List<RB_MOProductReplenish> listReplenish,
+			int productID,
+			int warehouseID
+			){
+		RB_MOProductReplenish r = null;
+		for (RB_MOProductReplenish replenish: listReplenish) {
+			if (replenish.getProduct_id() == productID
+					&& replenish.getWarehouse_id() == warehouseID) {
+				r = replenish;
+				break;
+			}
+		}
+		return r;
 	}
 	
 	RB_MORouting getRouting(
