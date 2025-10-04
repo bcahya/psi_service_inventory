@@ -541,6 +541,7 @@ public class SISGlobalExecute {
 		List<LinkedHashMap<String, Object>> listMove = (List<LinkedHashMap<String, Object>>) mapMO.get("list_move");
 		List<LinkedHashMap<String, Object>> listReq = (List<LinkedHashMap<String, Object>>) mapMO.get("list_req");
 		
+		int seqMove = 1000;
 		for (RB_MOBOMLine bomLine: bom.getList_line()) {
 			RB_MOProduct product = getProduct(rbmo.getList_product(), bomLine.getProduct_id());
 			List<RB_MORouting> listProductRouting = getListProductRouting(rbmo.getList_routing(),
@@ -563,7 +564,7 @@ public class SISGlobalExecute {
 				}
 				RB_MORouting routing = getNextRouting(listProductRouting, locSearchID, isFrom);
 				if (routing == null) {
-					continue;
+					break;
 				}
 				if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)) {
 					locSearchID = routing.getLocatorto_id();
@@ -596,7 +597,12 @@ public class SISGlobalExecute {
 					}
 					
 					if(isGenMove) {
-						generateMove(listMove, routing, bomLine.getProduct_id(), qtyLine);
+						if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)) {
+							seqMove += 1;
+						} else {
+							seqMove -= 1;
+						}
+						generateMove(listMove, routing, bomLine.getProduct_id(), qtyLine, false, seqMove);
 					}
 				}
 				if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_BUY)) {
@@ -625,6 +631,7 @@ public class SISGlobalExecute {
 		List<RB_MORouting> listProductRouting = getListProductRouting(rbmo.getList_routing(),
 				rbmo.getList_product(), bom.getProduct_id());
 		boolean isFrom = true;
+		seqMove = 1100;
 		while(true) {
 			counter += 1;
 			if (counter > 15) {
@@ -650,9 +657,15 @@ public class SISGlobalExecute {
 				isGenMove = true;
 			}
 			if (isGenMove) {
-				generateMove(listMove, routing, bom.getProduct_id(), qty);
+				if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)) {
+					seqMove += 1;
+				} else {
+					seqMove -= 1;
+				}
+				generateMove(listMove, routing, bom.getProduct_id(), qty, true, seqMove);
 			}
 		}
+		
 		for (LinkedHashMap<String, Object> mapReq: listReq) {
 			List<LinkedHashMap<String, Object>> listReqLine = (List<LinkedHashMap<String, Object>>)mapReq.get("list_line");
 			for (LinkedHashMap<String, Object> mapReqLine: listReqLine) {
@@ -668,6 +681,9 @@ public class SISGlobalExecute {
 				}
 			}
 		}
+		
+//		List<LinkedHashMap<String, Object>> listGroupMove = groupingMove(listMove);
+//		mapMO.put("list_move", listGroupMove);
 		listMO.add(mapMO);
 	}
 	
@@ -675,14 +691,16 @@ public class SISGlobalExecute {
 			List<LinkedHashMap<String, Object>> listMove,
 			RB_MORouting routing,
 			int productID,
-			BigDecimal qty
+			BigDecimal qty,
+			boolean isFG,
+			int seqMove
 			) {
 		LinkedHashMap<String, Object> mapMove = new LinkedHashMap<>();
 		boolean moveExist = false;
 		for (LinkedHashMap<String, Object> map: listMove) {
 			if ((int)map.get("locatorfrom_id") == routing.getLocatorfrom_id()
 					&& (int)map.get("locatorto_id") == routing.getLocatorto_id()
-							&& (int)map.get("product_id") == productID
+							&& (boolean)map.get("is_fg") == isFG
 					) {
 				mapMove = map;
 				moveExist = true;
@@ -692,10 +710,28 @@ public class SISGlobalExecute {
 		if (mapMove.isEmpty()) {
 			mapMove.put("locatorfrom_id", routing.getLocatorfrom_id());
 			mapMove.put("locatorto_id", routing.getLocatorto_id());
-			mapMove.put("product_id", productID);
-			mapMove.put("qty", new BigDecimal(0));
+			mapMove.put("is_fg", isFG);
+			mapMove.put("seq", seqMove);
+			mapMove.put("list_product", new ArrayList<>());
 		}
-		mapMove.put("qty", ((BigDecimal)mapMove.get("qty")).add(qty));
+		List<LinkedHashMap<String,Object>> listProduct = (List<LinkedHashMap<String,Object>>)mapMove.get("list_product");
+		LinkedHashMap<String, Object> mapProduct = new LinkedHashMap<>();
+		boolean isProductExists = false;
+		for (LinkedHashMap<String, Object> mapP: listProduct) {
+			if (mapP.get("product_id").equals(productID)) {
+				isProductExists = true;
+				mapProduct = mapP;
+				break;
+			}
+		}
+		if (mapProduct.isEmpty()) {
+			mapProduct.put("product_id", productID);
+			mapProduct.put("qty", new BigDecimal(0));
+		}
+		mapProduct.put("qty", ((BigDecimal)mapProduct.get("qty")).add(qty));
+		if (!isProductExists) {
+			listProduct.add(mapProduct);
+		}
 		if (!moveExist) {
 			listMove.add(mapMove);
 		}
@@ -746,6 +782,52 @@ public class SISGlobalExecute {
 		if (!reqExist) {
 			listReq.add(mapReq);
 		}
+	}
+	
+	List<LinkedHashMap<String,Object>> groupingMove(
+			List<LinkedHashMap<String,Object>> listMove
+			){
+		List<LinkedHashMap<String, Object>> listMoveSum = new ArrayList<>();
+		for (LinkedHashMap<String, Object> mapMove: listMove) {
+			LinkedHashMap<String, Object> mapMv = new LinkedHashMap<>();
+			boolean isExists = false;
+			for (LinkedHashMap<String, Object> mapMS: listMoveSum) {
+				if (mapMS.get("locatorfrom_id").equals(mapMove.get("locatorfrom_id"))
+						&& mapMS.get("locatorto_id").equals(mapMove.get("locatorto_id"))) {
+					isExists = true;
+					mapMv = mapMS;
+					break;
+				}
+			}
+			if (mapMv.isEmpty()) {
+				mapMv.put("locatorfrom_id", mapMove.get("locatorfrom_id"));
+				mapMv.put("locatorto_id", mapMove.get("locatorto_id"));
+				mapMv.put("list_product", new ArrayList<>());
+			}
+			List<LinkedHashMap<String,Object>> listProduct = (List<LinkedHashMap<String,Object>>)mapMv.get("list_product");
+			LinkedHashMap<String, Object> mapProduct = new LinkedHashMap<>();
+			boolean isProductExists = false;
+			for (LinkedHashMap<String, Object> mapP: listProduct) {
+				if (mapP.get("product_id").equals(mapMove.get("product_id"))) {
+					isProductExists = true;
+					mapProduct = mapP;
+					break;
+				}
+			}
+			if (mapProduct.isEmpty()) {
+				mapProduct.put("product_id", mapMove.get("product_id"));
+				mapProduct.put("qty", new BigDecimal(0));
+			}
+			mapProduct.put("qty", ((BigDecimal)mapProduct.get("qty")).add((BigDecimal)mapMove.get("qty")));
+			if (!isProductExists) {
+				listProduct.add(mapProduct);
+			}
+			if (!isExists) {
+				listMoveSum.add(mapMv);
+			}
+		}
+		
+		return listMoveSum;
 	}
 	
 	RB_MORouting getNextRouting(
