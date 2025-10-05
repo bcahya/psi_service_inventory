@@ -630,7 +630,7 @@ public class SISGlobalExecute {
 		int counter = 0;
 		List<RB_MORouting> listProductRouting = getListProductRouting(rbmo.getList_routing(),
 				rbmo.getList_product(), bom.getProduct_id());
-		boolean isFrom = true;
+		boolean isFrom = false;
 		seqMove = 1100;
 		while(true) {
 			counter += 1;
@@ -638,12 +638,17 @@ public class SISGlobalExecute {
 				throw new Exception("Routing never ending loop!");
 			}
 			RB_MORouting routing = getNextRouting(listProductRouting, locSearchID, isFrom);
-			if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)) {
+			if (routing == null) {
+				break;
+			}
+			if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)
+					|| routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_MANUFACTURE)) {
 				isFrom = true;
 				locSearchID = routing.getLocatorto_id();
 			} else if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PULLFROM)) {
-				isFrom = false;
-				locSearchID = routing.getLocatorfrom_id();
+//				isFrom = false;
+//				locSearchID = routing.getLocatorfrom_id();
+				break;
 			}
 			if (routingLineID == routing.getRoutingline_id()) {
 				break;
