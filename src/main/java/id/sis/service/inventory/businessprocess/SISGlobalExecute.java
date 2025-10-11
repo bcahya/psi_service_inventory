@@ -541,7 +541,7 @@ public class SISGlobalExecute {
 		List<LinkedHashMap<String, Object>> listMove = (List<LinkedHashMap<String, Object>>) mapMO.get("list_move");
 		List<LinkedHashMap<String, Object>> listReq = (List<LinkedHashMap<String, Object>>) mapMO.get("list_req");
 		
-		int seqMove = 1000;
+		int seqMove = 100000;
 		for (RB_MOBOMLine bomLine: bom.getList_line()) {
 			RB_MOProduct product = getProduct(rbmo.getList_product(), bomLine.getProduct_id());
 			List<RB_MORouting> listProductRouting = getListProductRouting(rbmo.getList_routing(),
@@ -598,9 +598,9 @@ public class SISGlobalExecute {
 					
 					if(isGenMove) {
 						if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)) {
-							seqMove += 1;
+							seqMove += 100;
 						} else {
-							seqMove -= 1;
+							seqMove -= 100;
 						}
 						generateMove(listMove, routing, bomLine.getProduct_id(), qtyLine, false, seqMove);
 					}
@@ -631,7 +631,7 @@ public class SISGlobalExecute {
 		List<RB_MORouting> listProductRouting = getListProductRouting(rbmo.getList_routing(),
 				rbmo.getList_product(), bom.getProduct_id());
 		boolean isFrom = false;
-		seqMove = 1100;
+		seqMove = 150000;
 		while(true) {
 			counter += 1;
 			if (counter > 15) {
@@ -663,9 +663,9 @@ public class SISGlobalExecute {
 			}
 			if (isGenMove) {
 				if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)) {
-					seqMove += 1;
+					seqMove += 100;
 				} else {
-					seqMove -= 1;
+					seqMove -= 100;
 				}
 				generateMove(listMove, routing, bom.getProduct_id(), qty, true, seqMove);
 			}
