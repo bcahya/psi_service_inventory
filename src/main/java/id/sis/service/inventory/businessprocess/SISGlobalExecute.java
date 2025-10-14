@@ -478,16 +478,19 @@ public class SISGlobalExecute {
 
 	//calculate MO
 	//////////////////////////////////////////////
+	List<LinkedHashMap<String, Object>> listMO = new ArrayList<>();
+	LinkedHashMap<Integer, BigDecimal> mapReqs = new LinkedHashMap<>();
+	List<Integer> listCekReq = new ArrayList<>();
 	public SISResponse calculateRoutingMO(RB_MO rbmo) throws Exception {
 		logger.info("[SIS] calculateRoutingMO mo_id : " + rbmo.getMo_id());
+		listMO.clear();
+		mapReqs.clear();
+		listCekReq.clear();
 		SISResponse response = new SISResponse();
 		try {
 			List<Map<String, Object>> resultList = new ArrayList<>();
 			LinkedHashMap<String, Object> mapResult = new LinkedHashMap<String, Object>();
 			mapResult.put("mo_id", rbmo.getMo_id());
-			
-			List<Map<String, Object>> listMO = new ArrayList<>();
-			
 			RB_MOBOM bomFG = null;
 			for (RB_MOBOM bom: rbmo.getList_bom()) {
 				if (bom.isIs_fg()) {
@@ -499,7 +502,34 @@ public class SISGlobalExecute {
 				throw new Exception("Please set bom FG!");
 			}
 			
-			calculateRouting(listMO, rbmo, bomFG, null, rbmo.getWarehouse_id(), rbmo.getLocator_pre_id(), rbmo.getLocator_post_id(), rbmo.getQty());
+			calculateRouting(rbmo, bomFG, null, rbmo.getWarehouse_id(), rbmo.getLocator_pre_id(), rbmo.getLocator_post_id(), rbmo.getQty());
+			
+			for (LinkedHashMap<String, Object> mapMO: listMO) {
+				List<LinkedHashMap<String, Object>> listReq = (List<LinkedHashMap<String, Object>>)mapMO.get("list_req");
+				for (LinkedHashMap<String, Object> mapReq: listReq) {
+					List<LinkedHashMap<String, Object>> listReqLine = (List<LinkedHashMap<String, Object>>)mapReq.get("list_line");
+					for (LinkedHashMap<String, Object> mapReqLine: listReqLine) {
+						int productID = (int)mapReqLine.get("product_id");
+						if (listCekReq.contains(productID)) {
+							mapReqLine.put("qty", new BigDecimal(0));
+							continue;
+						}
+						RB_MOProductReplenish pr = getProductReplenish(rbmo.getList_replenish(), (int)mapReqLine.get("product_id"), (int)mapReq.get("warehouse_id"));
+						if (pr != null) {
+							BigDecimal qtyRep = pr.getMin();
+							if (pr.getMax().compareTo(qtyRep) > 0) {
+								qtyRep = pr.getMax();
+							}
+							if (qtyRep.compareTo(mapReqs.get(productID)) < 0){
+								qtyRep = mapReqs.get(productID);
+							}
+							mapReqLine.put("qty", qtyRep);
+						}
+						listCekReq.add(productID);
+					}
+				}
+			}
+			
 			mapResult.put("list_mo", listMO);
 			resultList.add(mapResult);
 			response = SISResponse.successResponse(resultList);
@@ -510,7 +540,6 @@ public class SISGlobalExecute {
 	}
 	
 	void calculateRouting(
-			List<Map<String, Object>> listMO,
 			RB_MO rbmo,
 			RB_MOBOM bom,
 			RB_MOBOM bomSource,
@@ -583,10 +612,15 @@ public class SISGlobalExecute {
 				if (routing.getOperation_type().equalsIgnoreCase(SISConstants.MO_ROUTING_OPERATION_TAKEFROMSTOCK)
 						|| routing.getOperation_type().equalsIgnoreCase(SISConstants.MO_ROUTING_OPERATION_TAKEFROMSTOCKTRIGGERANOTHERRULE)) {
 					boolean isGenMove = false;
+					BigDecimal qtySOH = new BigDecimal(0);
+					RB_MOSOH soh = getSOH(rbmo.getList_soh(), product.getProduct_id(), locSearchID);
+					if (soh != null) {
+						qtySOH = soh.getQty();
+					}
 					if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PULLFROM)) {
-						BigDecimal qtySOH = getQtySOH(rbmo.getList_soh(), product.getProduct_id(), locSearchID);
 						BigDecimal qtyDiff = qtySOH.subtract(qtyLine);
 						if (qtyDiff.signum() >= 0) {
+							soh.setQty(qtyDiff);
 							break;
 						} else {
 							if (routing.getOperation_type().equalsIgnoreCase(SISConstants.MO_ROUTING_OPERATION_TAKEFROMSTOCK)) {
@@ -606,7 +640,18 @@ public class SISGlobalExecute {
 					}
 				}
 				if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_BUY)) {
-					generateReq(listReq, rbmo, routing, bomLine.getProduct_id(), qtyLine);
+					BigDecimal qtySOH = new BigDecimal(0);
+					RB_MOSOH soh = getSOH(rbmo.getList_soh(), product.getProduct_id(), locSearchID);
+					if (soh != null) {
+						qtySOH = soh.getQty();
+					}
+					BigDecimal qtyDiff = qtyLine;
+					if (qtySOH.signum() > 0) {
+						qtyDiff = qtySOH.subtract(qtyLine);
+						qtySOH = qtySOH.subtract(qtyLine);
+					}
+					generateReq(listReq, rbmo, routing, bomLine.getProduct_id(), qtyDiff.abs());
+					soh.setQty(qtySOH);
 					break;
 				}
 				if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_MANUFACTURE)) {
@@ -619,7 +664,7 @@ public class SISGlobalExecute {
 						throw new Exception("BOM for product id "+product.getProduct_id()+" is missing!");
 					}
 					RB_MOWH wh = getWarehouse(rbmo.getList_wh(), bomTo.getWarehouse_id());
-					calculateRouting(listMO, rbmo, bomTo, bomSrc, wh.getWarehouse_id(), wh.getLocator_pre_id(), wh.getLocator_post_id(), qtyLine);
+					calculateRouting(rbmo, bomTo, bomSrc, wh.getWarehouse_id(), wh.getLocator_pre_id(), wh.getLocator_post_id(), qtyLine);
 					break;
 				}
 			}
@@ -668,22 +713,6 @@ public class SISGlobalExecute {
 					seqMove -= 100;
 				}
 				generateMove(listMove, routing, bom.getProduct_id(), qty, true, seqMove);
-			}
-		}
-		
-		for (LinkedHashMap<String, Object> mapReq: listReq) {
-			List<LinkedHashMap<String, Object>> listReqLine = (List<LinkedHashMap<String, Object>>)mapReq.get("list_line");
-			for (LinkedHashMap<String, Object> mapReqLine: listReqLine) {
-				RB_MOProductReplenish pr = getProductReplenish(rbmo.getList_replenish(), (int)mapReqLine.get("product_id"), (int)mapReq.get("warehouse_id"));
-				if (pr != null) {
-					BigDecimal qtyRep = pr.getMin();
-					if (pr.getMax().compareTo(qtyRep) > 0) {
-						qtyRep = pr.getMax();
-					}
-					if (pr.getMin().compareTo((BigDecimal)mapReqLine.get("qty")) > 0) {
-						mapReqLine.put("qty", qtyRep);
-					}
-				}
 			}
 		}
 		
@@ -749,12 +778,17 @@ public class SISGlobalExecute {
 			int productID,
 			BigDecimal qty
 			) {
+		if (!mapReqs.containsKey(productID)) {
+			mapReqs.put(productID, new BigDecimal(0));
+		}
+		mapReqs.put(productID, mapReqs.get(productID).add(qty));
+		
 		LinkedHashMap<String, Object> mapReq = new LinkedHashMap<>();
 		RB_MOProduct product = getProduct(rbmo.getList_product(), productID);
 		boolean reqExist = false;
 		for (LinkedHashMap<String, Object> map: listReq) {
 			if ((int)map.get("bp_id") == product.getBp_id()
-					&& (int)map.get("warehouse_id") == routing.getWarehousefrom_id()
+					&& (int)map.get("warehouse_id") == routing.getWarehouseto_id()
 					) {
 				mapReq = map;
 				reqExist = true;
