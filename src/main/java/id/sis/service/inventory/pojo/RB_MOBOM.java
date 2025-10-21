@@ -9,8 +9,15 @@ public class RB_MOBOM {
 	int bom_source_id = 0;
 	int warehouse_id = 0;
 	boolean is_fg = false;
+	String bomtype = "MF";
 	List<RB_MOBOMLine> list_line = new ArrayList<RB_MOBOMLine>();
 	
+	public String getBomtype() {
+		return bomtype;
+	}
+	public void setBomtype(String bomtype) {
+		this.bomtype = bomtype;
+	}
 	public int getProduct_id() {
 		return product_id;
 	}

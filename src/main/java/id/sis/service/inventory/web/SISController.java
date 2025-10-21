@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 
 import id.sis.service.inventory.pojo.RB_InventoryCharge;
 import id.sis.service.inventory.pojo.RB_MO;
+import id.sis.service.inventory.pojo.RB_Req;
 import id.sis.service.inventory.response.SISResponse;
 import id.sis.service.inventory.service.SISServiceImpl;
 
@@ -82,6 +83,24 @@ public class SISController {
 
 		try {
 			response = sisService.calculateRoutingMO(
+					param
+					);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		return response;
+	}
+	
+	@ResponseBody
+	@RequestMapping(value = "/calculateReqSubcont", method = RequestMethod.POST)
+	SISResponse calculateReqSubcont(
+			@RequestBody RB_Req param
+			) {
+		SISResponse response = new SISResponse();
+
+		try {
+			response = sisService.calculateReqSubcont(
 					param
 					);
 		} catch (Exception e) {

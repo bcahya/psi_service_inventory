@@ -10,6 +10,7 @@ import id.sis.service.inventory.businessprocess.SISApi;
 import id.sis.service.inventory.businessprocess.SISGlobalExecute;
 import id.sis.service.inventory.pojo.RB_InventoryCharge;
 import id.sis.service.inventory.pojo.RB_MO;
+import id.sis.service.inventory.pojo.RB_Req;
 import id.sis.service.inventory.response.SISResponse;
 import id.sis.service.inventory.utils.SISUtil;
 
@@ -39,6 +40,11 @@ public class SISServiceImpl{
 	public SISResponse calculateRoutingMO(RB_MO param) throws Exception {
         logger.info("execute calculateRoutingMO");
         return ex.calculateRoutingMO(param);
+    }
+	
+	public SISResponse calculateReqSubcont(RB_Req param) throws Exception {
+        logger.info("execute calculateReqSubcont");
+        return ex.calculateReqSubcont(param);
     }
 
 //    @Scheduled(cron = "0 */10 * * * *")
