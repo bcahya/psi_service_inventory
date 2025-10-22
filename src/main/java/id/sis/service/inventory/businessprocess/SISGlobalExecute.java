@@ -776,7 +776,7 @@ public class SISGlobalExecute {
 				List<RB_MORouting> listProductRouting = bu.getListProductRouting(rbReq.getList_routing(),
 						rbReq.getList_product(), rbRL.getProduct_id());
 				boolean isFrom = true;
-				int seqMove = 100000;
+				int seqMove = 99900;
 				
 				//generate movement
 				while(true) {

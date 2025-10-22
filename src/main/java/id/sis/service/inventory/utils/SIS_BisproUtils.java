@@ -88,7 +88,10 @@ public class SIS_BisproUtils {
 		List<RB_MORouting> listProductRouting = new ArrayList<RB_MORouting>();
 		RB_MOProduct product = getProduct(listProduct, productID);
 		for(Integer rID: product.getList_routing()) {
-			listProductRouting.add(getRouting(listRouting, rID));
+			RB_MORouting routing = getRouting(listRouting, rID);
+			if (routing != null) {
+				listProductRouting.add(routing);
+			}
 		}
 		return listProductRouting;
 	}
