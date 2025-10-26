@@ -9,14 +9,14 @@ public class RB_ReqLine {
 	int requisition_id;
 	int product_id = 0;
 	int bom_id = 0;
-	int bomsource_id = 0;
+	int bom_source_id = 0;
 	BigDecimal qty = new BigDecimal(0);
 	
-	public int getBomsource_id() {
-		return bomsource_id;
+	public int getBom_source_id() {
+		return bom_source_id;
 	}
-	public void setBomsource_id(int bomsource_id) {
-		this.bomsource_id = bomsource_id;
+	public void setBom_source_id(int bom_source_id) {
+		this.bom_source_id = bom_source_id;
 	}
 	public int getBom_id() {
 		return bom_id;

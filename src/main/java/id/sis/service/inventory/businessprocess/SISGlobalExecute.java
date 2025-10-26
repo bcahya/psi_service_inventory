@@ -769,101 +769,103 @@ public class SISGlobalExecute {
 				listPOP = (List<LinkedHashMap<String, Object>>)mapResult.get("list_pop");
 				
 				BigDecimal qty = rbRL.getQty();
-				int routingLineID = 0;
-				RB_MOProduct product = bu.getProduct(rbReq.getList_product(), rbRL.getProduct_id());
 				int locSearchID = rbRL.getLocator_id();
-				int counter = 0;
-				List<RB_MORouting> listProductRouting = bu.getListProductRouting(rbReq.getList_routing(),
-						rbReq.getList_product(), rbRL.getProduct_id());
-				boolean isFrom = true;
-				int seqMove = 99900;
+				RB_MOProduct product = bu.getProduct(rbReq.getList_product(), rbRL.getProduct_id());
 				
 				//generate movement
-				while(true) {
-					counter += 1;
-					if (counter > 15) {
-						throw new Exception("Routing never ending loop!");
-					}
-					RB_MORouting routing = bu.getNextRouting(listProductRouting, locSearchID, isFrom);
-					if (routing == null) {
-						break;
-					}
-					if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)
-							|| routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_MANUFACTURE)) {
-						isFrom = true;
-						locSearchID = routing.getLocatorto_id();
-					} else if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PULLFROM)) {
-//						isFrom = false;
-//						locSearchID = routing.getLocatorfrom_id();
-						break;
-					}
-					if (routingLineID == routing.getRoutingline_id()) {
-						break;
-					}
-					routingLineID = routing.getRoutingline_id();
-					locSearchID = routing.getLocatorto_id();
-					boolean isGenMove = false;
-					if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)) {
-						isGenMove = true;
-					} else if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PULLFROM)) {
-						isGenMove = true;
-					}
-					if (isGenMove) {
-						if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)) {
-							seqMove += 100;
-						} else {
-							seqMove -= 100;
+				if (product.isIs_bom()) {
+					int seqMove = 99900;
+					RB_MOBOM bom = bu.getBOM(rbReq.getList_bom(), rbRL.getBom_id());
+					if (bom.getBomtype().equalsIgnoreCase("SC")) {
+						for (RB_MOBOMLine bl: bom.getList_line()) {
+							BigDecimal qtyLine = qty.multiply(bl.getQty());
+							int routingLineID = 0;
+							locSearchID = rbRL.getLocator_id();
+							int counter = 0;
+							RB_MOProduct productLine = bu.getProduct(rbReq.getList_product(), bl.getProduct_id());
+							List<RB_MORouting> listProductRouting = bu.getListProductRouting(rbReq.getList_routing(),
+									rbReq.getList_product(), bl.getProduct_id());
+							boolean isFrom = true;
+							
+							if (productLine.isIs_bom()) {
+								RB_MOBOM bomRef = bu.getBOM(rbReq.getList_bom(), bom.getBom_id(), bl.getProduct_id());
+								if (!bomRef.getBomtype().equalsIgnoreCase("SC")) {
+									continue;
+								}
+							}
+							
+							while(true) {
+								counter += 1;
+								if (counter > 15) {
+									throw new Exception("Routing never ending loop!");
+								}
+								RB_MORouting routing = bu.getNextRouting(listProductRouting, locSearchID, isFrom, "PT");
+								if (routing == null) {
+									break;
+								}
+								if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)
+										|| routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_MANUFACTURE)) {
+									isFrom = true;
+									locSearchID = routing.getLocatorto_id();
+								} else if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PULLFROM)) {
+			//						isFrom = false;
+			//						locSearchID = routing.getLocatorfrom_id();
+									break;
+								}
+								if (routingLineID == routing.getRoutingline_id()) {
+									break;
+								}
+								routingLineID = routing.getRoutingline_id();
+								locSearchID = routing.getLocatorto_id();
+								boolean isGenMove = false;
+								if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)) {
+									isGenMove = true;
+								} else if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PULLFROM)) {
+									isGenMove = true;
+								}
+								if (isGenMove) {
+									if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)) {
+										seqMove += 100;
+									} else {
+										seqMove -= 100;
+									}
+									bu.generateMove(listMove, routing, productLine.getProduct_id(), qtyLine, true, seqMove);
+								}
+							}
 						}
-						bu.generateMove(listMove, routing, product.getProduct_id(), qty, true, seqMove);
 					}
 				}
 				
 				//generate Requisition Components
-				boolean isSC = false;
-				if (rbRL.getBom_id() > 0) {
-					RB_MOBOM bom = bu.getBOM(rbReq.getList_bom(), rbRL.getBomsource_id(), product.getProduct_id());
+				if (product.isIs_bom()) {
+					RB_MOBOM bom = bu.getBOM(rbReq.getList_bom(), rbRL.getBom_id());
 					if (bom.getBomtype().equalsIgnoreCase("SC")) {
-						isSC = true;
-					}
-				}
-				if (!product.isIs_bom()
-						|| isSC) {
-					BigDecimal qtyLine = qty;
-					BigDecimal qtySOH = new BigDecimal(0);
-					RB_MOSOH soh = bu.getSOH(rbReq.getList_soh(), product.getProduct_id(), locSearchID);
-					if (soh != null) {
-						qtySOH = soh.getQty();
-					}
-					BigDecimal qtyDiff = qtyLine;
-					if (qtySOH.signum() > 0) {
-						qtyDiff = qtySOH.subtract(qtyLine);
-						qtySOH = qtySOH.subtract(qtyLine);
-					}
-					bu.generateReq(mapReqs, listReq, rbReq.getList_product(), rbRL.getWarehouse_id(), product.getProduct_id(), qtyDiff.abs());
-					if (soh != null) {
-						soh.setQty(qtySOH);
-					}
-				} else {
-					LinkedHashMap<String, Object> mapPOP = new LinkedHashMap<String, Object>();
-					boolean isExistPOP = false;
-					for (LinkedHashMap<String, Object> mapP: listPOP) {
-						int productID = (int)mapP.get("product_id");
-						int bomID = (int)mapP.get("bom_id");
-						if (productID == product.getProduct_id()
-								&& bomID == rbRL.getBom_id()) {
-							mapPOP = mapP;
-							isExistPOP = true;
-							break;
+						for (RB_MOBOMLine bl: bom.getList_line()) {
+							BigDecimal qtyLine = qty.multiply(bl.getQty());
+							generateReqSC(rbReq, bl.getProduct_id(), locSearchID, rbRL.getWarehouse_id(), qtyLine, listReq);
 						}
-					}
-					if (mapPOP.isEmpty()) {
-						mapPOP.put("product_id", product.getProduct_id());
-						mapPOP.put("bom_id", rbRL.getBom_id());
-						mapPOP.put("qty", new BigDecimal(0));
-					}
-					mapPOP.put("qty", ((BigDecimal)mapPOP.get("qty")).add(qty));
-					if (!isExistPOP) {
-						listPOP.add(mapPOP);
+					} else {
+						LinkedHashMap<String, Object> mapPOP = new LinkedHashMap<String, Object>();
+						boolean isExistPOP = false;
+						for (LinkedHashMap<String, Object> mapP: listPOP) {
+							int productID = (int)mapP.get("product_id");
+							int bomID = (int)mapP.get("bom_id");
+							if (productID == product.getProduct_id()
+									&& bomID == rbRL.getBom_id()) {
+								mapPOP = mapP;
+								isExistPOP = true;
+								break;
+							}
+						}
+						if (mapPOP.isEmpty()) {
+							mapPOP.put("product_id", product.getProduct_id());
+							mapPOP.put("bom_id", rbRL.getBom_id());
+							mapPOP.put("qty", new BigDecimal(0));
+						}
+						mapPOP.put("qty", ((BigDecimal)mapPOP.get("qty")).add(qty));
+						if (!isExistPOP) {
+							listPOP.add(mapPOP);
+						}
 					}
 				}
 				
@@ -902,6 +904,30 @@ public class SISGlobalExecute {
 			response = SISResponse.errorResponse(e.getMessage());
 		}
 		return response;
+	}
+	
+	public void generateReqSC(
+			RB_Req rbReq,
+			int productID,
+			int locID,
+			int warehouseID,
+			BigDecimal qty,
+			List<LinkedHashMap<String, Object>> listReq
+			) {
+		BigDecimal qtySOH = new BigDecimal(0);
+		RB_MOSOH soh = bu.getSOH(rbReq.getList_soh(), productID, locID);
+		if (soh != null) {
+			qtySOH = soh.getQty();
+		}
+		BigDecimal qtyDiff = qty;
+		if (qtySOH.signum() > 0) {
+			qtyDiff = qtySOH.subtract(qty);
+			qtySOH = qtySOH.subtract(qty);
+		}
+		bu.generateReq(mapReqs, listReq, rbReq.getList_product(), warehouseID, productID, qtyDiff.abs());
+		if (soh != null) {
+			soh.setQty(qtySOH);
+		}
 	}
 	//////////////////////////////////////////////////
 	

@@ -80,6 +80,27 @@ public class SIS_BisproUtils {
 		return routing;
 	}
 	
+	public RB_MORouting getNextRouting(
+			List<RB_MORouting> listProductRouting,
+			int locatorID,
+			boolean isFrom,
+			String action
+			) {
+		RB_MORouting routing = null;
+		for (RB_MORouting r: listProductRouting) {
+			int locID = r.getLocatorfrom_id();
+			if (!isFrom) {
+				locID = r.getLocatorto_id();
+			}
+			if (locID == locatorID
+					&& r.getAction().equalsIgnoreCase(action)) {
+				routing = r;
+				break;
+			}
+		}
+		return routing;
+	}
+	
 	public List<RB_MORouting> getListProductRouting(
 			List<RB_MORouting> listRouting,
 			List<RB_MOProduct> listProduct,
@@ -119,6 +140,20 @@ public class SIS_BisproUtils {
 		for (RB_MOBOM b: listBOM) {
 			if (b.getBom_source_id() == bomSourceID
 					&& b.getProduct_id() == productID) {
+				bom = b;
+				break;
+			}
+		}
+		return bom;
+	}
+	
+	public RB_MOBOM getBOM(
+			List<RB_MOBOM> listBOM,
+			int bomID
+			){
+		RB_MOBOM bom = null;
+		for (RB_MOBOM b: listBOM) {
+			if (b.getBom_id() == bomID) {
 				bom = b;
 				break;
 			}
