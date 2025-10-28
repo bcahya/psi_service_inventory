@@ -552,6 +552,12 @@ public class SISGlobalExecute {
 			int postLocatorID,
 			BigDecimal qty
 			) throws Exception {
+		if (preLocatorID == 0) {
+			throw new Exception("Please setup pre locator for bom id "+bom.getBom_id());
+		}
+		if (postLocatorID == 0) {
+			throw new Exception("Please setup post locator for bom id "+bom.getBom_id());
+		}
 		LinkedHashMap<String, Object> mapMO = new LinkedHashMap<>();
 		mapMO.put("bom_id", bom.getBom_id());
 		mapMO.put("bom_source_id", 0);
@@ -627,22 +633,16 @@ public class SISGlobalExecute {
 							if (soh != null) {
 								soh.setQty(qtyDiff);
 							}
+							seqMove = bu.generateMove(listMove, routing, bomLine.getProduct_id(), qtyLine, false, seqMove);
 							break;
 						} else {
 							if (routing.getOperation_type().equalsIgnoreCase(SISConstants.MO_ROUTING_OPERATION_TAKEFROMSTOCK)) {
 								throw new Exception("Routing line ID "+routing.getRoutingline_id()+" for product id "+bomLine.getProduct_id()+" is no action to do!");
 							}
-							isGenMove = true;
+							seqMove = bu.generateMove(listMove, routing, bomLine.getProduct_id(), qtyLine, false, seqMove);
 						}
-					}
-					
-					if(isGenMove) {
-						if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)) {
-							seqMove += 100;
-						} else {
-							seqMove -= 100;
-						}
-						bu.generateMove(listMove, routing, bomLine.getProduct_id(), qtyLine, false, seqMove);
+					} else {
+						seqMove = bu.generateMove(listMove, routing, bomLine.getProduct_id(), qtyLine, false, seqMove);
 					}
 				}
 				if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_BUY)) {
@@ -708,19 +708,9 @@ public class SISGlobalExecute {
 			}
 			routingLineID = routing.getRoutingline_id();
 			locSearchID = routing.getLocatorto_id();
-			boolean isGenMove = false;
-			if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)) {
-				isGenMove = true;
-			} else if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PULLFROM)) {
-				isGenMove = true;
-			}
-			if (isGenMove) {
-				if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)) {
-					seqMove += 100;
-				} else {
-					seqMove -= 100;
-				}
-				bu.generateMove(listMove, routing, bom.getProduct_id(), qty, true, seqMove);
+			if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)
+					|| routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PULLFROM)) {
+				seqMove = bu.generateMove(listMove, routing, bom.getProduct_id(), qty, true, seqMove);
 			}
 		}
 		
@@ -817,19 +807,9 @@ public class SISGlobalExecute {
 								}
 								routingLineID = routing.getRoutingline_id();
 								locSearchID = routing.getLocatorto_id();
-								boolean isGenMove = false;
-								if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)) {
-									isGenMove = true;
-								} else if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PULLFROM)) {
-									isGenMove = true;
-								}
-								if (isGenMove) {
-									if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)) {
-										seqMove += 100;
-									} else {
-										seqMove -= 100;
-									}
-									bu.generateMove(listMove, routing, productLine.getProduct_id(), qtyLine, true, seqMove);
+								if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)
+										|| routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PULLFROM)) {
+									seqMove = bu.generateMove(listMove, routing, productLine.getProduct_id(), qtyLine, true, seqMove);
 								}
 							}
 						}

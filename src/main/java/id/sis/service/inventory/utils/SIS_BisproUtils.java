@@ -246,7 +246,7 @@ public class SIS_BisproUtils {
 		return isBOM;
 	}
 	
-	public void generateMove(
+	public int generateMove(
 			List<LinkedHashMap<String, Object>> listMove,
 			RB_MORouting routing,
 			int productID,
@@ -254,6 +254,11 @@ public class SIS_BisproUtils {
 			boolean isFG,
 			int seqMove
 			) {
+		if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)) {
+			seqMove += 100;
+		} else {
+			seqMove -= 100;
+		}
 		LinkedHashMap<String, Object> mapMove = new LinkedHashMap<>();
 		boolean moveExist = false;
 		for (LinkedHashMap<String, Object> map: listMove) {
@@ -294,6 +299,7 @@ public class SIS_BisproUtils {
 		if (!moveExist) {
 			listMove.add(mapMove);
 		}
+		return seqMove;
 	}
 	
 	public void generateReq(
