@@ -581,6 +581,7 @@ public class SISGlobalExecute {
 		List<LinkedHashMap<String, Object>> listReq = (List<LinkedHashMap<String, Object>>) mapMO.get("list_req");
 		
 		int seqMove = 100000;
+		int seqSC = 100000;
 		for (RB_MOBOMLine bomLine: bom.getList_line()) {
 			RB_MOProduct product = bu.getProduct(rbmo.getList_product(), bomLine.getProduct_id());
 			List<RB_MORouting> listProductRouting = bu.getListProductRouting(rbmo.getList_routing(),
@@ -595,13 +596,30 @@ public class SISGlobalExecute {
 			int locSearchID = preLocatorID;
 			int routingLineID = 0;
 			boolean isFrom = false;
+			boolean isSC = false;
+			if (bom.getBomtype().equalsIgnoreCase("SC")) {
+				isSC = true;
+			}
+			if (isSC) {
+//				isFrom = true;
+				RB_MOWH wh = bu.getWarehouse(rbmo.getList_wh(), bom.getWarehouse_id());
+				locSearchID = wh.getLocator_stock_id();
+				if (product.isIs_bom()) {
+					RB_MOBOM bomSC = bu.getBOM(rbmo.getList_bom(), bom.getBom_id(), product.getProduct_id());
+					if (!bomSC.getBomtype().equalsIgnoreCase("SC")) {
+						wh = bu.getWarehouse(rbmo.getList_wh(), bomSC.getWarehouse_id());
+						locSearchID = wh.getLocator_pre_id();
+					}
+				}
+			}
 			int counter = 0;
 			while(true) {
 				counter += 1;
 				if (counter > 15) {
 					throw new Exception("Routing never ending loop!");
 				}
-				RB_MORouting routing = bu.getNextRouting(listProductRouting, locSearchID, isFrom);
+				RB_MORouting routing = null;
+				routing = bu.getNextRouting(listProductRouting, locSearchID, isFrom);
 				if (routing == null) {
 					break;
 				}
@@ -616,12 +634,12 @@ public class SISGlobalExecute {
 					break;
 				}
 				routingLineID = routing.getRoutingline_id();
-				if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)) {
+				if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)
+						&& !bom.getBomtype().equalsIgnoreCase("SC")) {
 					throw new Exception("Routing Line ID "+routing.getRoutingline_id()+" not allowed to set action PUSH TO!");
 				}
 				if (routing.getOperation_type().equalsIgnoreCase(SISConstants.MO_ROUTING_OPERATION_TAKEFROMSTOCK)
 						|| routing.getOperation_type().equalsIgnoreCase(SISConstants.MO_ROUTING_OPERATION_TAKEFROMSTOCKTRIGGERANOTHERRULE)) {
-					boolean isGenMove = false;
 					BigDecimal qtySOH = new BigDecimal(0);
 					RB_MOSOH soh = bu.getSOH(rbmo.getList_soh(), product.getProduct_id(), locSearchID);
 					if (soh != null) {
@@ -660,10 +678,17 @@ public class SISGlobalExecute {
 					if (soh != null) {
 						soh.setQty(qtySOH);
 					}
+					
+					if (isSC) {
+						RB_MOWH wh = bu.getWarehouse(rbmo.getList_wh(), bom.getWarehouse_id());
+						seqSC = generateMoveSC(listMove, rbmo.getList_wh(), wh, rbmo.getList_bom(), bom, product,
+								listProductRouting, qtyLine, seqSC);
+					}
 					break;
 				}
 				if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_MANUFACTURE)) {
-					if (!product.isIs_bom()) {
+					if (!product.isIs_bom()
+							&& routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_MANUFACTURE)) {
 						throw new Exception("product id "+product.getProduct_id()+" doesn't have bom!");
 					}
 					RB_MOBOM bomSrc = bom;
@@ -673,8 +698,14 @@ public class SISGlobalExecute {
 					}
 					RB_MOWH wh = bu.getWarehouse(rbmo.getList_wh(), bomTo.getWarehouse_id());
 					calculateRouting(rbmo, bomTo, bomSrc, wh.getWarehouse_id(), wh.getLocator_pre_id(), wh.getLocator_post_id(), qtyLine);
+					if (isSC) {
+						RB_MOWH whf = bu.getWarehouse(rbmo.getList_wh(), bom.getWarehouse_id());
+						seqSC = generateMoveSC(listMove, rbmo.getList_wh(), whf, rbmo.getList_bom(), bom, product,
+								listProductRouting, qtyLine, seqSC);
+					}
 					break;
 				}
+				
 			}
 		}
 		
@@ -720,6 +751,58 @@ public class SISGlobalExecute {
 	}
 	
 	
+	public int generateMoveSC(
+			List<LinkedHashMap<String, Object>> listMove,
+			List<RB_MOWH> listWH,
+			RB_MOWH wh,
+			List<RB_MOBOM> listBOM,
+			RB_MOBOM bom,
+			RB_MOProduct product,
+			List<RB_MORouting> listProductRouting,
+			BigDecimal qtyLine,
+			int seqMove
+			) throws Exception {
+		boolean isFrom = true;
+		int locSearchID = wh.getLocator_stock_id();
+		if (product.isIs_bom()) {
+			RB_MOBOM bomSC = bu.getBOM(listBOM, bom.getBom_id(), product.getProduct_id());
+			if (!bomSC.getBomtype().equalsIgnoreCase("SC")) {
+				wh = bu.getWarehouse(listWH, bomSC.getWarehouse_id());
+				locSearchID = wh.getLocator_post_id();
+			}
+		}
+		int routingPushLineID = 0;
+		int counter = 0;
+		while(true) {
+			counter += 1;
+			if (counter > 15) {
+				throw new Exception("Routing never ending loop!");
+			}
+			RB_MORouting routingPush = bu.getNextRouting(listProductRouting, locSearchID, isFrom, "PT");
+			if (routingPush == null) {
+				break;
+			}
+			if (routingPush.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)
+					|| routingPush.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_MANUFACTURE)) {
+				isFrom = true;
+				locSearchID = routingPush.getLocatorto_id();
+			} else if (routingPush.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PULLFROM)) {
+//				isFrom = false;
+//				locSearchID = routingPush.getLocatorfrom_id();
+				break;
+			}
+			if (routingPushLineID == routingPush.getRoutingline_id()) {
+				break;
+			}
+			routingPushLineID = routingPush.getRoutingline_id();
+			locSearchID = routingPush.getLocatorto_id();
+			if (routingPush.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)
+					|| routingPush.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PULLFROM)) {
+				seqMove = bu.generateMove(listMove, routingPush, product.getProduct_id(), qtyLine, true, seqMove);
+			}
+		}
+		return seqMove;
+	}
 	///////////////////////////////////////////////////
 	
 	
