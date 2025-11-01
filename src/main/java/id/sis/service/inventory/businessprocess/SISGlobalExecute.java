@@ -720,14 +720,14 @@ public class SISGlobalExecute {
 		int counter = 0;
 		List<RB_MORouting> listProductRouting = bu.getListProductRouting(rbmo.getList_routing(),
 				rbmo.getList_product(), bom.getProduct_id());
-		boolean isFrom = false;
+		boolean isFrom = true;
 		seqMove = 150000;
 		while(true) {
 			counter += 1;
 			if (counter > 15) {
 				throw new Exception("Routing never ending loop!");
 			}
-			RB_MORouting routing = bu.getNextRouting(listProductRouting, locSearchID, isFrom);
+			RB_MORouting routing = bu.getNextRouting(listProductRouting, locSearchID, isFrom, "PT");
 			if (routing == null) {
 				break;
 			}
