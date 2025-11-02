@@ -949,8 +949,9 @@ public class SISGlobalExecute {
 									}
 								}
 								if (mapPOP.isEmpty()) {
+									RB_MOBOM b = bu.getBOM(rbReq.getList_bom(), rbRL.getBom_id(), prd.getProduct_id());
 									mapPOP.put("product_id", prd.getProduct_id());
-									mapPOP.put("bom_id", rbRL.getBom_id());
+									mapPOP.put("bom_id", b.getBom_id());
 									mapPOP.put("qty", new BigDecimal(0));
 								}
 								mapPOP.put("qty", ((BigDecimal)mapPOP.get("qty")).add(qty));
