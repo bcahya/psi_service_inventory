@@ -518,17 +518,17 @@ public class SISGlobalExecute {
 							mapReqLine.put("qty", new BigDecimal(0));
 							continue;
 						}
-						RB_MOProductReplenish pr = bu.getProductReplenish(rbmo.getList_replenish(), (int)mapReqLine.get("product_id"), (int)mapReq.get("warehouse_id"));
-						if (pr != null) {
-							BigDecimal qtyRep = pr.getMin();
-							if (pr.getMax().compareTo(qtyRep) > 0) {
-								qtyRep = pr.getMax();
-							}
-							if (qtyRep.compareTo(mapReqs.get(productID)) < 0){
-								qtyRep = mapReqs.get(productID);
-							}
-							mapReqLine.put("qty", qtyRep);
-						}
+//						RB_MOProductReplenish pr = bu.getProductReplenish(rbmo.getList_replenish(), (int)mapReqLine.get("product_id"), (int)mapReq.get("warehouse_id"));
+//						if (pr != null) {
+//							BigDecimal qtyRep = pr.getMin();
+//							if (pr.getMax().compareTo(qtyRep) > 0) {
+//								qtyRep = pr.getMax();
+//							}
+//							if (qtyRep.compareTo(mapReqs.get(productID)) < 0){
+//								qtyRep = mapReqs.get(productID);
+//							}
+//							mapReqLine.put("qty", qtyRep);
+//						}
 						listCekReq.add(productID);
 					}
 				}
@@ -584,6 +584,9 @@ public class SISGlobalExecute {
 		int seqSC = 100000;
 		for (RB_MOBOMLine bomLine: bom.getList_line()) {
 			RB_MOProduct product = bu.getProduct(rbmo.getList_product(), bomLine.getProduct_id());
+			if (product == null) {
+				throw new Exception("Product id "+bomLine.getProduct_id()+" not in bom id "+bom.getBom_id());
+			}
 			List<RB_MORouting> listProductRouting = bu.getListProductRouting(rbmo.getList_routing(),
 					rbmo.getList_product(), bomLine.getProduct_id());
 			BigDecimal qtyLine = bomLine.getQty().multiply(qty);
@@ -978,17 +981,17 @@ public class SISGlobalExecute {
 							mapReqLine.put("qty", new BigDecimal(0));
 							continue;
 						}
-						RB_MOProductReplenish pr = bu.getProductReplenish(rbReq.getList_replenish(), (int)mapReqLine.get("product_id"), (int)mapReq.get("warehouse_id"));
-						if (pr != null) {
-							BigDecimal qtyRep = pr.getMin();
-							if (pr.getMax().compareTo(qtyRep) > 0) {
-								qtyRep = pr.getMax();
-							}
-							if (qtyRep.compareTo(mapReqs.get(productID)) < 0){
-								qtyRep = mapReqs.get(productID);
-							}
-							mapReqLine.put("qty", qtyRep);
-						}
+//						RB_MOProductReplenish pr = bu.getProductReplenish(rbReq.getList_replenish(), (int)mapReqLine.get("product_id"), (int)mapReq.get("warehouse_id"));
+//						if (pr != null) {
+//							BigDecimal qtyRep = pr.getMin();
+//							if (pr.getMax().compareTo(qtyRep) > 0) {
+//								qtyRep = pr.getMax();
+//							}
+//							if (qtyRep.compareTo(mapReqs.get(productID)) < 0){
+//								qtyRep = mapReqs.get(productID);
+//							}
+//							mapReqLine.put("qty", qtyRep);
+//						}
 						listCekReq.add(productID);
 					}
 				}
