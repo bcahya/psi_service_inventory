@@ -731,7 +731,8 @@ public class SISGlobalExecute {
 				throw new Exception("Routing never ending loop!");
 			}
 			RB_MORouting routing = bu.getNextRouting(listProductRouting, locSearchID, isFrom, "PT");
-			if (routing == null) {
+			if (routing == null
+					|| routing.getIs_subcont().equalsIgnoreCase("Y")) {
 				break;
 			}
 			if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)

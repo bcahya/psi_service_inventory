@@ -9,7 +9,14 @@ public class RB_MORouting {
 	int locatorfrom_id = 0;
 	int warehouseto_id = 0;
 	int locatorto_id = 0;
+	String is_subcont = "N";
 	
+	public String getIs_subcont() {
+		return is_subcont;
+	}
+	public void setIs_subcont(String is_subcont) {
+		this.is_subcont = is_subcont;
+	}
 	public String getOperation_type() {
 		return operation_type;
 	}
