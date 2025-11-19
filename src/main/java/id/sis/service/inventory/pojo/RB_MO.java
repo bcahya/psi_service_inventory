@@ -11,6 +11,7 @@ public class RB_MO {
 	int locator_pre_id = 0;
 	int locator_post_id = 0;
 	int locator_stock_id = 0;
+	String is_subcont = "N";
 	List<RB_MORouting> list_routing = new ArrayList<>();
 	List<RB_MOBOM> list_bom = new ArrayList<>();
 	List<RB_MOSOH> list_soh = new ArrayList<>();
@@ -18,6 +19,12 @@ public class RB_MO {
 	List<RB_MOProduct> list_product = new ArrayList<>();
 	List<RB_MOProductReplenish> list_replenish = new ArrayList<>();
 	
+	public String getIs_subcont() {
+		return is_subcont;
+	}
+	public void setIs_subcont(String is_subcont) {
+		this.is_subcont = is_subcont;
+	}
 	public List<RB_MOProductReplenish> getList_replenish() {
 		return list_replenish;
 	}

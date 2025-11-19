@@ -732,7 +732,9 @@ public class SISGlobalExecute {
 			}
 			RB_MORouting routing = bu.getNextRouting(listProductRouting, locSearchID, isFrom, "PT");
 			if (routing == null
-					|| routing.getIs_subcont().equalsIgnoreCase("Y")) {
+					|| (routing.getIs_subcont().equalsIgnoreCase("Y")
+							&& !rbmo.getIs_subcont().equalsIgnoreCase("Y"))
+					) {
 				break;
 			}
 			if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)
