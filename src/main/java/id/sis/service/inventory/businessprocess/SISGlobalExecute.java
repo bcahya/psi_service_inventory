@@ -686,7 +686,7 @@ public class SISGlobalExecute {
 					}
 					if (qtySOH.signum() < 0) {
 						bu.generateReq(mapReqs, listReq, rbmo.getList_product(), routing.getWarehouseto_id(), bomLine.getProduct_id(), qtySOH.abs());
-						soh.setQty(new BigDecimal(0));
+//						soh.setQty(new BigDecimal(0));
 					}
 					if (isSC) {
 						RB_MOWH wh = bu.getWarehouse(rbmo.getList_wh(), bom.getWarehouse_id());
@@ -960,7 +960,7 @@ public class SISGlobalExecute {
 									mapPOP.put("bom_id", b.getBom_id());
 									mapPOP.put("qty", new BigDecimal(0));
 								}
-								mapPOP.put("qty", ((BigDecimal)mapPOP.get("qty")).add(qty));
+								mapPOP.put("qty", ((BigDecimal)mapPOP.get("qty")).add(qtyLine));
 								if (!isExistPOP) {
 									listPOP.add(mapPOP);
 								}
