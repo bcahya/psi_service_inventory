@@ -518,7 +518,7 @@ public class SISGlobalExecute {
 							mapReqLine.put("qty", new BigDecimal(0));
 							continue;
 						}
-//						RB_MOProductReplenish pr = bu.getProductReplenish(rbmo.getList_replenish(), (int)mapReqLine.get("product_id"), (int)mapReq.get("warehouse_id"));
+						RB_MOProductReplenish pr = bu.getProductReplenish(rbmo.getList_replenish(), (int)mapReqLine.get("product_id"), (int)mapReq.get("warehouse_id"));
 //						if (pr != null) {
 //							BigDecimal qtyRep = pr.getMin();
 //							if (pr.getMax().compareTo(qtyRep) > 0) {
@@ -529,6 +529,7 @@ public class SISGlobalExecute {
 //							}
 //							mapReqLine.put("qty", qtyRep);
 //						}
+						mapReqLine.put("qty", mapReqs.get(productID));
 						listCekReq.add(productID);
 					}
 				}
@@ -686,7 +687,7 @@ public class SISGlobalExecute {
 					}
 					if (qtySOH.signum() < 0) {
 						bu.generateReq(mapReqs, listReq, rbmo.getList_product(), routing.getWarehouseto_id(), bomLine.getProduct_id(), qtySOH.abs());
-//						soh.setQty(new BigDecimal(0));
+						soh.setQty(new BigDecimal(0));
 					}
 					if (isSC) {
 						RB_MOWH wh = bu.getWarehouse(rbmo.getList_wh(), bom.getWarehouse_id());
