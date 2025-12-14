@@ -1,13 +1,28 @@
 package id.sis.service.inventory.businessprocess;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.function.Function;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,6 +30,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.DefaultTransactionDefinition;
 
 import id.sis.service.inventory.pojo.RB_InventoryCharge;
 import id.sis.service.inventory.pojo.RB_InventoryChargeBOM;
@@ -41,13 +59,20 @@ public class SISGlobalExecute {
 	private final static Logger logger = LoggerFactory.getLogger(SISGlobalExecute.class);
 	List<Map<String, Object>> listData = new ArrayList<>();
 	SIS_BisproUtils bu = new SIS_BisproUtils();
-
+	String sql = "";
+    
 	@Autowired
 	@Qualifier("jdbcTemplateCdcSource")
 	private JdbcTemplate source;
 
 	@Autowired
 	private SISIdProperties sisIdProperties;
+	
+	@Autowired
+    private PlatformTransactionManager transactionManager;
+
+	SISUtil u = new SISUtil(source, sisIdProperties);
+	
 
 //	@Transactional(rollbackFor = Exception.class)
 //	public SISResponse executeFWspCreateMaterialEDX(String name) throws Exception {
@@ -1031,5 +1056,376 @@ public class SISGlobalExecute {
 		}
 	}
 	//////////////////////////////////////////////////
+	
+	public SISResponse importTrans() throws Exception {
+		logger.info("[SIS] processMT940");
+		SISResponse response = new SISResponse();
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		try {
+			
+			List<String> listErr = new ArrayList<>();
+			List<Integer> listpoID = new ArrayList<>();
+			try {
+				List<Integer> listID = execDir(listErr, sisIdProperties.getDir_po(), dirs -> {
+					return generatePO(dirs);
+				});
+				
+				Set<Integer> uniqueSet = new HashSet<>(listID);
+				listpoID = new ArrayList<>(uniqueSet);
+				
+				for (int poID: listpoID) {
+					sql =
+							"with t1 as ( "
+							+ "	select "
+							+ "		ol.c_orderline_id, "
+							+ "		ol.c_order_id, "
+							+ "		pl.istaxincluded, "
+							+ "		ol.linenetamt, "
+							+ "		sis_gettaxamt(ol.c_tax_id, ol.linenetamt, pl.istaxincluded) taxamt "
+							+ "	from c_orderline ol "
+							+ "	inner join c_order o "
+							+ "		on o.c_order_id = ol.c_order_id "
+							+ "	inner join m_pricelist pl "
+							+ "		on pl.m_pricelist_id = o.m_pricelist_id "
+							+ "	where ol.c_order_id = ? "
+							+ "), t2 as ( "
+							+ "	select "
+							+ "		t1.c_order_id, "
+							+ "		sum( "
+							+ "			case "
+							+ "				when t1.istaxincluded = 'N' "
+							+ "				then t1.linenetamt + t1.taxamt "
+							+ "				else t1.linenetamt "
+							+ "			end "
+							+ "		) grandtotal, "
+							+ "		sum(t1.linenetamt) totallines "
+							+ "	from t1 "
+							+ "	group by "
+							+ "		t1.c_order_id "
+							+ ") "
+							+ "update c_order "
+							+ "	set grandtotal = t2.grandtotal, "
+							+ "	totallines = t2.totallines "
+							+ "from t2 "
+							+ "where t2.c_order_id = c_order.c_order_id ";
+					int rowAffected = source.update(
+							sql,
+							poID
+					);
+				}
+			} catch (Exception e) {
+				System.out.println("generate PO error "+e.getMessage());
+			}
+			
+	        Map<String, Object> map = new LinkedHashMap<String, Object>();
+	        map.put("list_po_id", listpoID);
+	        map.put("list_error", listErr);
+	        resultList.add(map);
+			response = SISResponse.successResponse(resultList);
+		} catch (Exception e) {
+			response = SISResponse.errorResponse(e.getMessage());
+		}
+		return response;
+	}
+	
+	List<Integer> execDir(
+			List<String> listErr, 
+			String dirs, 
+			Function<String, List<Integer>> action) throws Exception{
+		List<Integer> listBSID = new ArrayList<>();
+		String dirPath = dirs;
+		if (SISUtil.cekIsNull(dirPath)) {
+    		throw new Exception("Please setup Directory!");
+    	}
+		
+		File dir = new File(dirPath);
+        File[] files = dir.listFiles();
+        if (files.length == 0) {
+        	throw new Exception("file is empty!");
+        }
+        Arrays.sort(files, Comparator.comparingLong(File::lastModified).reversed());
+
+        for (File file: files) {
+        	if (file.isDirectory()) {
+        		continue;
+        	}
+        	String filePath = dirPath+file.getName();
+        	DefaultTransactionDefinition def = new DefaultTransactionDefinition();
+    		TransactionStatus status = transactionManager.getTransaction(def);
+    		try {
+        		List<Integer> listMT = action.apply(filePath);// exec bispro
+        		listBSID.addAll(listMT);
+        		transactionManager.commit(status);
+        		
+        		//move file to done
+		        String dirDone = dirPath+"done/";
+		        Path donePath = Paths.get(dirDone);
+		        Files.createDirectories(donePath);
+		        Path sourcePath = Paths.get(filePath);
+		        Path targetPath = Paths.get(dirDone+file.getName());
+		        Files.move(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
+		        
+        	} catch (Exception e) {
+        		listErr.add("filename "+file.getName()+" - "+e.getMessage());
+        		transactionManager.rollback(status);
+			}
+        }
+        return listBSID;
+	}
+	
+	BigDecimal docCount = SISUtil.getBigDecimal(u.getRefNoTime());
+	List<Integer> generatePO(String filePath){
+		u = new SISUtil(source, sisIdProperties);
+		List<Integer> listID = new ArrayList<>();
+		String csvFile = filePath; // Ensure this file exists
+        String line = "";
+        String csvDelimiter = ","; // Use the correct delimiter
+        
+        String[] files = filePath.split("/");
+        String fileName = files[files.length-1].replace(".csv", "");
+        String[] fileNames = fileName.split("_");
+        int ad_org_id = (int)u.getObject("ad_org", "value", "ad_org_id::int", fileNames[0]);
+        int m_product_id = (int)u.getObject("m_product", "value", "m_product_id::int", fileNames[1]);
+        String period = (String)fileNames[2];
+        
+        Timestamp now = u.getCurrentTime();
+        HashMap<String, Integer> mapCol = new HashMap<>();
+        mapCol.put("wh", 0);
+        mapCol.put("price", 1);
+        mapCol.put("bp", 2);
+        mapCol.put("tax", 3);
+        mapCol.put("date", 4);
+        try (BufferedReader br = new BufferedReader(new FileReader(csvFile))) {
+            String headerLine = br.readLine();
+            if (headerLine != null) {
+                System.out.println("Headers: " + String.join(", ", headerLine.split(csvDelimiter)));
+            }
+            
+            // Read data lines
+            while ((line = br.readLine()) != null) {
+                String[] values = line.split(csvDelimiter);
+                int whID = (int)u.getObject("m_warehouse", "value", "m_warehouse_id::int", values[mapCol.get("wh")]);
+                BigDecimal price = SISUtil.getBigDecimal(values[mapCol.get("price")]);
+                int bpID = (int)u.getObject("c_bpartner", "value", "c_bpartner_id::int", values[mapCol.get("bp")]);
+                int taxID = (int)u.getObject("c_tax", "name", "c_tax_id::int", values[mapCol.get("tax")]);
+                int bpLocID = (int)u.getObject("c_bpartner_location", "c_bpartner_id", "c_bpartner_location_id::int", bpID);
+                int day = 0;
+                for (int a=mapCol.get("date"); a<values.length; a++) {
+                	day += 1;
+                	String date = period + SISUtil.addZero(day, 2);
+                	if (values[a] == null
+                			|| values[a].equalsIgnoreCase("")) {
+                		continue;
+                	}
+                	
+                	BigDecimal qty = SISUtil.getBigDecimal(values[a]);
+                    Timestamp dateordered = SISUtil.getTimestamp(date);
+                	int c_order_id = getOrderID(date, ad_org_id, sisIdProperties.getPo_doctype_id(), bpID, whID, "N");
+                	if (c_order_id <= 0) {
+                		docCount = docCount.add(new BigDecimal(1));
+                		c_order_id = u.getNextSysID("C_Order");
+    	            	sql =
+                    		"insert into c_order ( "
+                    		+ "	c_order_id, "
+                    		+ "	ad_client_id, "
+                    		+ "	ad_org_id, "
+                    		+ "	issotrx, "
+                    		+ "	sis_status_docno, "
+                    		+ "	documentno, "
+                    		+ "	c_doctypetarget_id, "
+                    		+ "	dateacct, "
+                    		+ "	dateordered, "
+                    		+ "	datepromised, "
+                    		+ "	c_bpartner_id, "
+                    		+ "	c_bpartner_location_id, "
+                    		+ "	ad_user_id, "
+                    		+ "	m_warehouse_id, "
+                    		+ "	deliveryviarule, "
+                    		+ "	priorityrule, "
+                    		+ "	m_pricelist_id, "
+                    		+ "	c_currency_id, "
+                    		+ "	salesrep_id, "
+                    		+ "	paymentrule, "
+                    		+ "	invoicerule, "
+                    		+ "	deliveryrule, "
+                    		+ "	freightcostrule, "
+                    		+ "	docstatus, "
+                    		+ "	docaction, "
+                    		+ "	c_doctype_id, "
+                    		+ "	c_paymentterm_id, "
+                    		+ "	c_order_uu, "
+                    		+ "	created, "
+                    		+ "	updated, "
+                    		+ "	createdby, "
+                    		+ "	updatedby "
+                    		+ ") values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ";
+                        int rowsAffected = source.update(
+                                sql, 
+                                c_order_id, 
+                                sisIdProperties.getAd_client_id(), 
+                                ad_org_id, 
+                                "N",
+                                "R",
+                                String.valueOf(docCount),
+                                sisIdProperties.getPo_doctype_id(),
+                                dateordered,
+                                dateordered,
+                                dateordered,
+                                bpID,
+                                bpLocID,
+                                sisIdProperties.getAd_user_id(),
+                                whID,
+                                "P",
+                                "5",
+                                sisIdProperties.getPo_pricelist_id(),
+                                sisIdProperties.getC_currency_id(),
+                                sisIdProperties.getAd_user_id(),
+                                "B",
+                                "D",
+                                "A",
+                                "I",
+                                "DR",
+                                "CO",
+                                0,
+                                sisIdProperties.getPo_paymentterm_id(),
+                                UUID.randomUUID(),
+                                now,
+                                now,
+                                sisIdProperties.getAd_user_id(),
+                                sisIdProperties.getAd_user_id()
+                            );
+                	}
+                	
+                	int c_orderline_id = getOrderLineID(c_order_id, m_product_id, taxID, qty, price);
+                	if (c_orderline_id <= 0) {
+                		if (!listID.contains(c_order_id)) {
+                			listID.add(c_order_id);
+                		}
+                    	int lineNo = ((int)u.getObject("c_orderline", "c_order_id", "coalesce((max(line)),0)::int lineno", c_order_id))+10;
+                    	int c_uom_id = (int)u.getObject("m_product", "m_product_id", "c_uom_id::int", m_product_id);
+                		c_orderline_id = u.getNextSysID("C_OrderLine");
+    	            	sql =
+                    		"insert into c_orderline ( "
+                    		+ "	c_orderline_id, "
+                    		+ "	ad_client_id, "
+                    		+ "	ad_org_id, "
+                    		+ "	c_order_id, "
+                    		+ "	c_bpartner_id, "
+                    		+ "	c_bpartner_location_id, "
+                    		+ "	datepromised, "
+                    		+ "	dateordered, "
+                    		+ "	line, "
+                    		+ "	m_product_id, "
+                    		+ "	qtyentered, "
+                    		+ "	c_uom_id, "
+                    		+ "	qtyordered, "
+                    		+ "	priceentered, "
+                    		+ "	priceactual, "
+                    		+ "	c_tax_id, "
+                    		+ "	m_warehouse_id, "
+                    		+ "	c_currency_id, "
+                    		+ "	linenetamt, "
+                    		+ "	c_orderline_uu, "
+                    		+ "	created, "
+                    		+ "	updated, "
+                    		+ "	createdby, "
+                    		+ "	updatedby "
+                    		+ ") values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ";
+                        int rowsAffected = source.update(
+                                sql, 
+                                c_orderline_id, 
+                                sisIdProperties.getAd_client_id(), 
+                                ad_org_id, 
+                                c_order_id,
+                                bpID,
+                                bpLocID,
+                                dateordered,
+                                dateordered,
+                                lineNo,
+                                m_product_id,
+                                qty,
+                                c_uom_id,
+                                qty,
+                                price,
+                                price,
+                                taxID,
+                                whID,
+                                sisIdProperties.getC_currency_id(),
+                                qty.multiply(price),
+                                UUID.randomUUID(),
+                                now,
+                                now,
+                                sisIdProperties.getAd_user_id(),
+                                sisIdProperties.getAd_user_id()
+                            );
+                	}
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+		return listID;
+	}
+	
+	int getOrderID(
+			String dateordered,
+			int ad_org_id,
+			int c_doctype_id,
+			int c_bpartner_id,
+			int m_warehouse_id,
+			String issotrx
+			) {
+		int id = 0;
+		String sql = 
+			"select "
+			+ "	o.c_order_id::int id "
+			+ "from c_order o "
+			+ "where o.docstatus in ('DR') "
+			+ "and o.ad_client_id = "+sisIdProperties.getAd_client_id()+" "
+			+ "and trunc(o.dateordered) = trunc('"+dateordered+"'::date) "
+			+ "and o.ad_org_id = "+ad_org_id+" "
+			+ "and o.c_doctype_id = "+c_doctype_id+" "
+			+ "and o.c_bpartner_id = "+c_bpartner_id+" "
+			+ "and o.m_warehouse_id = "+m_warehouse_id+" "
+			+ "and o.issotrx = '"+issotrx+"' "
+	        ;
+		List<Map<String, Object>> resultList = source.queryForList(sql);
+		if (!resultList.isEmpty()) {
+			for (Map<String, Object> map: resultList) {
+				id = (int)map.get("id");
+				break;
+			}
+		}
+		return id;
+	}
+	
+	int getOrderLineID(
+			int c_order_id,
+			int m_product_id,
+			int c_tax_id,
+			BigDecimal qty,
+			BigDecimal price
+			) {
+		int id = 0;
+		String sql = 
+			"select "
+			+ "	ol.c_orderline_id::int id "
+			+ "from c_orderline ol "
+			+ "where ol.c_order_id = "+c_order_id+" "
+			+ "and ol.isactive = 'Y' "
+			+ "and ol.m_product_id = "+m_product_id+" "
+			+ "and ol.c_tax_id = "+c_tax_id+" "
+			+ "and ol.qtyentered = "+qty+" "
+	        + "and ol.priceentered = "+price+" "
+	        ;
+		List<Map<String, Object>> resultList = source.queryForList(sql);
+		if (!resultList.isEmpty()) {
+			for (Map<String, Object> map: resultList) {
+				id = (int)map.get("id");
+				break;
+			}
+		}
+		return id;
+	}
 	
 }

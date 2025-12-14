@@ -110,4 +110,19 @@ public class SISController {
 		return response;
 	}
 	
+	@ResponseBody
+	@RequestMapping(value = "/importTrans", method = RequestMethod.POST)
+	SISResponse importTrans(
+//			@RequestParam("m_inventory_id") Integer m_inventory_id
+			) {
+		SISResponse response = new SISResponse();
+
+		try {
+			response = sisService.importTrans();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		return response;
+	}
 }
