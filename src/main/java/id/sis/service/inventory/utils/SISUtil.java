@@ -1,42 +1,48 @@
 package id.sis.service.inventory.utils;
 
+import java.io.File;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.DefaultTransactionDefinition;
 
 import id.sis.service.inventory.properties.SISIdProperties;
 
 @Component
 public class SISUtil {
 	
-	@Autowired
-	@Qualifier("jdbcTemplateCdcSource")
 	private JdbcTemplate source;
-
-	@Autowired
 	private SISIdProperties sisIdProperties;
-	
-	@Autowired
-    private PlatformTransactionManager transactionManager;
+	private PlatformTransactionManager transactionManager;
 
 	public SISUtil(
 			JdbcTemplate source,
-			SISIdProperties sisIdProperties
+			SISIdProperties sisIdProperties,
+			PlatformTransactionManager transactionManager
 		) {
 		this.source = source;
 		this.sisIdProperties = sisIdProperties;
+		this.transactionManager = transactionManager;
 	}
 	
 	public SISUtil() {
@@ -305,5 +311,55 @@ public class SISUtil {
 			}
 		}
 		return id;
+	}
+	
+	@FunctionalInterface
+	public interface ThrowingFunction<T, R, E extends Exception> {
+	    R apply(T t) throws E;
+	}
+	
+	public List<Integer> execDir(
+			List<String> listErr, 
+			String dirs, 
+			ThrowingFunction<String, List<Integer>, Exception> action) throws Exception{
+		List<Integer> listBSID = new ArrayList<>();
+		String dirPath = dirs;
+		if (SISUtil.cekIsNull(dirPath)) {
+    		throw new Exception("Please setup Directory!");
+    	}
+		
+		File dir = new File(dirPath);
+        File[] files = dir.listFiles();
+        if (files.length == 0) {
+        	throw new Exception("file is empty!");
+        }
+        Arrays.sort(files, Comparator.comparingLong(File::lastModified).reversed());
+
+        for (File file: files) {
+        	if (file.isDirectory()) {
+        		continue;
+        	}
+        	String filePath = dirPath+file.getName();
+        	DefaultTransactionDefinition def = new DefaultTransactionDefinition();
+    		TransactionStatus status = transactionManager.getTransaction(def);
+    		try {
+        		List<Integer> listMT = action.apply(filePath);// exec bispro
+        		listBSID.addAll(listMT);
+        		transactionManager.commit(status);
+        		
+        		//move file to done
+		        String dirDone = dirPath+"done/";
+		        Path donePath = Paths.get(dirDone);
+		        Files.createDirectories(donePath);
+		        Path sourcePath = Paths.get(filePath);
+		        Path targetPath = Paths.get(dirDone+file.getName());
+		        Files.move(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
+		        
+        	} catch (Exception e) {
+        		listErr.add("filename "+file.getName()+" - "+e.getMessage());
+        		transactionManager.rollback(status);
+			}
+        }
+        return listBSID;
 	}
 }

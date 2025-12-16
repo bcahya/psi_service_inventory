@@ -1,20 +1,13 @@
 package id.sis.service.inventory.businessprocess;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.sql.Timestamp;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -22,7 +15,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.Function;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,8 +23,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionStatus;
-import org.springframework.transaction.support.DefaultTransactionDefinition;
 
 import id.sis.service.inventory.pojo.RB_InventoryCharge;
 import id.sis.service.inventory.pojo.RB_InventoryChargeBOM;
@@ -71,7 +61,7 @@ public class SISGlobalExecute {
 	@Autowired
     private PlatformTransactionManager transactionManager;
 
-	SISUtil u = new SISUtil(source, sisIdProperties);
+	SISUtil u = new SISUtil(source, sisIdProperties, transactionManager);
 	
 
 //	@Transactional(rollbackFor = Exception.class)
@@ -1058,7 +1048,8 @@ public class SISGlobalExecute {
 	//////////////////////////////////////////////////
 	
 	public SISResponse importTrans() throws Exception {
-		logger.info("[SIS] processMT940");
+		logger.info("[SIS] importTrans");
+		u = new SISUtil(source, sisIdProperties, transactionManager);
 		SISResponse response = new SISResponse();
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		try {
@@ -1066,7 +1057,7 @@ public class SISGlobalExecute {
 			List<String> listErr = new ArrayList<>();
 			List<Integer> listpoID = new ArrayList<>();
 			try {
-				List<Integer> listID = execDir(listErr, sisIdProperties.getDir_po(), dirs -> {
+				List<Integer> listID = u.execDir(listErr, sisIdProperties.getDir_po(), dirs -> {
 					return generatePO(dirs);
 				});
 				
@@ -1128,54 +1119,9 @@ public class SISGlobalExecute {
 		return response;
 	}
 	
-	List<Integer> execDir(
-			List<String> listErr, 
-			String dirs, 
-			Function<String, List<Integer>> action) throws Exception{
-		List<Integer> listBSID = new ArrayList<>();
-		String dirPath = dirs;
-		if (SISUtil.cekIsNull(dirPath)) {
-    		throw new Exception("Please setup Directory!");
-    	}
-		
-		File dir = new File(dirPath);
-        File[] files = dir.listFiles();
-        if (files.length == 0) {
-        	throw new Exception("file is empty!");
-        }
-        Arrays.sort(files, Comparator.comparingLong(File::lastModified).reversed());
-
-        for (File file: files) {
-        	if (file.isDirectory()) {
-        		continue;
-        	}
-        	String filePath = dirPath+file.getName();
-        	DefaultTransactionDefinition def = new DefaultTransactionDefinition();
-    		TransactionStatus status = transactionManager.getTransaction(def);
-    		try {
-        		List<Integer> listMT = action.apply(filePath);// exec bispro
-        		listBSID.addAll(listMT);
-        		transactionManager.commit(status);
-        		
-        		//move file to done
-		        String dirDone = dirPath+"done/";
-		        Path donePath = Paths.get(dirDone);
-		        Files.createDirectories(donePath);
-		        Path sourcePath = Paths.get(filePath);
-		        Path targetPath = Paths.get(dirDone+file.getName());
-		        Files.move(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
-		        
-        	} catch (Exception e) {
-        		listErr.add("filename "+file.getName()+" - "+e.getMessage());
-        		transactionManager.rollback(status);
-			}
-        }
-        return listBSID;
-	}
-	
 	BigDecimal docCount = SISUtil.getBigDecimal(u.getRefNoTime());
 	List<Integer> generatePO(String filePath){
-		u = new SISUtil(source, sisIdProperties);
+		u = new SISUtil(source, sisIdProperties, transactionManager);
 		List<Integer> listID = new ArrayList<>();
 		String csvFile = filePath; // Ensure this file exists
         String line = "";
@@ -1384,7 +1330,7 @@ public class SISGlobalExecute {
 			+ "and o.ad_client_id = "+sisIdProperties.getAd_client_id()+" "
 			+ "and trunc(o.dateordered) = trunc('"+dateordered+"'::date) "
 			+ "and o.ad_org_id = "+ad_org_id+" "
-			+ "and o.c_doctype_id = "+c_doctype_id+" "
+			+ "and o.c_doctypetarget_id = "+c_doctype_id+" "
 			+ "and o.c_bpartner_id = "+c_bpartner_id+" "
 			+ "and o.m_warehouse_id = "+m_warehouse_id+" "
 			+ "and o.issotrx = '"+issotrx+"' "
