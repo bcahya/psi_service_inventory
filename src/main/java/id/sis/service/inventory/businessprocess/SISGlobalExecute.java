@@ -1242,7 +1242,7 @@ public class SISGlobalExecute {
                             );
                 	}
                 	
-                	int c_orderline_id = getOrderLineID(c_order_id, m_product_id, taxID, qty, price);
+                	int c_orderline_id = getOrderLineID(c_order_id, m_product_id);
                 	if (c_orderline_id <= 0) {
                 		if (!listID.contains(c_order_id)) {
                 			listID.add(c_order_id);
@@ -1304,6 +1304,24 @@ public class SISGlobalExecute {
                                 sisIdProperties.getAd_user_id(),
                                 sisIdProperties.getAd_user_id()
                             );
+                	} else {
+                		sql =
+            				"update c_orderline "
+            				+ "	set c_tax_id=?, "
+            				+ "	priceentered=?, "
+            				+ "	priceactual=?, "
+            				+ "	qtyentered=?, "
+            				+ "	qtyordered=? "
+            				+ "where c_orderline_id=? ";
+                		int rowsAffected = source.update(
+                                sql,
+                                taxID,
+                                price,
+                                price,
+                                qty,
+                                qty,
+                                c_orderline_id
+                        );
                 	}
                 }
             }
@@ -1347,10 +1365,7 @@ public class SISGlobalExecute {
 	
 	int getOrderLineID(
 			int c_order_id,
-			int m_product_id,
-			int c_tax_id,
-			BigDecimal qty,
-			BigDecimal price
+			int m_product_id
 			) {
 		int id = 0;
 		String sql = 
@@ -1360,9 +1375,6 @@ public class SISGlobalExecute {
 			+ "where ol.c_order_id = "+c_order_id+" "
 			+ "and ol.isactive = 'Y' "
 			+ "and ol.m_product_id = "+m_product_id+" "
-			+ "and ol.c_tax_id = "+c_tax_id+" "
-			+ "and ol.qtyentered = "+qty+" "
-	        + "and ol.priceentered = "+price+" "
 	        ;
 		List<Map<String, Object>> resultList = source.queryForList(sql);
 		if (!resultList.isEmpty()) {
