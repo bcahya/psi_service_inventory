@@ -402,28 +402,42 @@ public class SISGlobalExecute {
 					}
 				} else if (type.equalsIgnoreCase("3")) {
 					List<RB_InventoryChargeDetail> listPD = mapType.get(type);
-					BigDecimal totalMaterial = new BigDecimal(0);
+					int rmID = 0;
+					BigDecimal rmAmt = new BigDecimal(0);
+					BigDecimal bkAmt = new BigDecimal(0);
 					for (int a=0; a<listPD.size(); a++) {
 						RB_InventoryChargeDetail pd = listPD.get(a);
 						if (!pd.isIs_kemas()) {
-							totalMaterial = totalMaterial.add(pd.getQty().multiply(pd.getPrice()));
+							rmID = pd.getM_product_id();
+							rmAmt = rmAmt.add(pd.getQty().multiply(pd.getPrice()));
 						} else {
-							for (RB_InventoryChargeBOM cb: param.getList_bom()) {
-								if (cb.getProduct_kemas_id() == pd.getM_product_id()) {
-									for (RB_InventoryChargeBOMMaterial cbm: cb.getList_material()) {
-										for(RB_InventoryChargeDetail pdm: listPD) {
-											if (pdm.getM_product_id().equals(cbm.getM_product_id())) {
-												totalMaterial = totalMaterial.add(pdm.getQty().multiply(pdm.getPrice()));
-											}
-										}
+							bkAmt = bkAmt.add(pd.getQty().multiply(pd.getPrice()));
+						}
+					}
+					
+					BigDecimal bomAmt = new BigDecimal(0);
+					if (rmAmt.signum() < 0
+							&& bkAmt.signum() < 0) {
+						for (RB_InventoryChargeBOM cb: param.getList_bom()) {
+							if (cb.getRm_id() == rmID) {
+								for (RB_InventoryChargeBOMMaterial cbm: cb.getList_material()) {
+									if (rmID == cbm.getM_product_id()) {
+										bomAmt = bomAmt.add(bkAmt.multiply(cbm.getQty()));
 									}
 								}
 							}
 						}
 					}
+					rmAmt = rmAmt.subtract(bomAmt);
+					if (rmAmt.signum() > 0) {
+						rmAmt = new BigDecimal(0);
+					} else {
+						rmAmt = rmAmt.abs();
+					}
+					
 					Map<String, Object> mapResult = new HashMap<String, Object>();
 					mapResult.put("m_inventory_id", param.getM_inventory_id());
-					mapResult.put("amt", totalMaterial);
+					mapResult.put("amt", rmAmt);
 					resultList.add(mapResult);
 				} else if (type.equalsIgnoreCase("4")) {
 					List<RB_InventoryChargeDetail> listPD = mapType.get(type);
