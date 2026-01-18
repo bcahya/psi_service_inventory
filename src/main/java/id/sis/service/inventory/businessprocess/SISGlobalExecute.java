@@ -405,8 +405,9 @@ public class SISGlobalExecute {
 					int rmID = 0;
 					BigDecimal rmAmt = new BigDecimal(0);
 					BigDecimal bkAmt = new BigDecimal(0);
+					RB_InventoryChargeDetail pd = null;
 					for (int a=0; a<listPD.size(); a++) {
-						RB_InventoryChargeDetail pd = listPD.get(a);
+						pd = listPD.get(a);
 						if (!pd.isIs_kemas()) {
 							rmID = pd.getM_product_id();
 							rmAmt = rmAmt.add(pd.getQty().multiply(pd.getPrice()));
@@ -437,6 +438,7 @@ public class SISGlobalExecute {
 					
 					Map<String, Object> mapResult = new HashMap<String, Object>();
 					mapResult.put("m_inventory_id", param.getM_inventory_id());
+					mapResult.put("m_inventoryline_id", pd.getM_inventoryline_id());
 					mapResult.put("amt", rmAmt);
 					resultList.add(mapResult);
 				} else if (type.equalsIgnoreCase("4")) {
@@ -446,6 +448,7 @@ public class SISGlobalExecute {
 						if (pd.getQty().signum() < 0 && pd.isIs_dibebankan()) {
 							Map<String, Object> mapResult = new HashMap<String, Object>();
 							mapResult.put("m_inventory_id", param.getM_inventory_id());
+							mapResult.put("m_inventoryline_id", 0);
 							mapResult.put("amt", pd.getQty().abs().multiply(pd.getPrice()));
 							resultList.add(mapResult);
 						}
