@@ -3,14 +3,21 @@ package id.sis.service.inventory.pojo;
 import java.util.List;
 
 public class RB_InventoryChargeBOM {
-	int rm_id;
+	int bom_id;
+	int m_product_id;
 	List<RB_InventoryChargeBOMMaterial> list_material;
 	
-	public int getRm_id() {
-		return rm_id;
+	public int getBom_id() {
+		return bom_id;
 	}
-	public void setRm_id(int rm_id) {
-		this.rm_id = rm_id;
+	public void setBom_id(int bom_id) {
+		this.bom_id = bom_id;
+	}
+	public int getM_product_id() {
+		return m_product_id;
+	}
+	public void setM_product_id(int m_product_id) {
+		this.m_product_id = m_product_id;
 	}
 	public List<RB_InventoryChargeBOMMaterial> getList_material() {
 		return list_material;

@@ -17,7 +17,21 @@ public class RB_InventoryChargeDetail {
 	BigDecimal percent;
 	boolean is_dibebankan;
 	boolean is_kemas;
+	Integer sis_bomcharge_id;
+	BigDecimal bom_price;
 	
+	public BigDecimal getBom_price() {
+		return bom_price;
+	}
+	public void setBom_price(BigDecimal bom_price) {
+		this.bom_price = bom_price;
+	}
+	public Integer getSis_bomcharge_id() {
+		return sis_bomcharge_id;
+	}
+	public void setSis_bomcharge_id(Integer sis_bomcharge_id) {
+		this.sis_bomcharge_id = sis_bomcharge_id;
+	}
 	public boolean isIs_kemas() {
 		return is_kemas;
 	}
