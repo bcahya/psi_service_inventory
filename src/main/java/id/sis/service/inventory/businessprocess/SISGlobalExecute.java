@@ -417,7 +417,7 @@ public class SISGlobalExecute {
 								mapAmt.put("price", new BigDecimal(0));
 								mapBK.put(key, mapAmt);
 							}
-							if (mapBK.get(key).get("qty").signum() < 0) {
+							if (pd.getQty().signum() < 0) {
 								mapBK.get(key).put("m_product_id", new BigDecimal(pd.getM_product_id()));
 							}
 							mapBK.get(key).put("qty", mapBK.get(key).get("qty").add(qty));
@@ -428,11 +428,12 @@ public class SISGlobalExecute {
 						} else if (pd.getCategory_seqno() == 20) {
 							if (!mapBJ.containsKey(key)) {
 								HashMap<String, BigDecimal> mapAmt = new HashMap<>();
+								mapAmt.put("m_product_id", new BigDecimal(0));
 								mapAmt.put("qty", new BigDecimal(0));
 								mapAmt.put("price", new BigDecimal(0));
 								mapBJ.put(key, mapAmt);
 							}
-							if (mapBJ.get(key).get("qty").signum() < 0) {
+							if (pd.getQty().signum() < 0) {
 								mapBJ.get(key).put("m_product_id", new BigDecimal(pd.getM_product_id()));
 							}
 							mapBJ.get(key).put("qty", mapBJ.get(key).get("qty").add(qty));
@@ -444,11 +445,12 @@ public class SISGlobalExecute {
 						} else {
 							if (!mapRM.containsKey(key)) {
 								HashMap<String, BigDecimal> mapAmt = new HashMap<>();
+								mapAmt.put("m_product_id", new BigDecimal(0));
 								mapAmt.put("qty", new BigDecimal(0));
 								mapAmt.put("price", new BigDecimal(0));
 								mapRM.put(key, mapAmt);
 							}
-							if (mapRM.get(key).get("qty").signum() < 0) {
+							if (pd.getQty().signum() < 0) {
 								mapRM.get(key).put("m_product_id", new BigDecimal(pd.getM_product_id()));
 							}
 							mapRM.get(key).put("qty", mapRM.get(key).get("qty").add(qty));
@@ -473,15 +475,18 @@ public class SISGlobalExecute {
 						if (mapBJTemp.get(key).get("qty").signum() > 0) {
 							mapBJ.remove(key);
 						} else {
-							if (mapBK.containsKey(key)) {
-								int bom_id = Integer.valueOf(key.split(";")[1]);
-								int m_product_id = mapBJ.get(key).get("m_product_id").intValue();
-								for (RB_InventoryChargeBOM cb: param.getList_bom()) {
-									if (cb.getBom_id() == bom_id) {
-										for (RB_InventoryChargeBOMMaterial cbm: cb.getList_material()) {
-											if (cbm.getM_product_id() == m_product_id) {
-												mapBJ.get(key).put(key, mapBJ.get(key).get("qty")
-														.subtract(cbm.getQty().multiply(mapBK.get(key).get("qty"))));
+							int bomID = Integer.valueOf(key.split(";")[1]);
+							for (String keyBK: mapBK.keySet()) {
+								int bomBKID = Integer.valueOf(keyBK.split(";")[1]);
+								if (bomID == bomBKID) {
+									int m_product_id = mapBJ.get(key).get("m_product_id").intValue();
+									for (RB_InventoryChargeBOM cb: param.getList_bom()) {
+										if (cb.getBom_id() == bomID) {
+											for (RB_InventoryChargeBOMMaterial cbm: cb.getList_material()) {
+												if (cbm.getM_product_id() == m_product_id) {
+													mapBJ.get(key).put("qty", mapBJ.get(key).get("qty")
+															.subtract(cbm.getQty().multiply(mapBK.get(keyBK).get("qty"))));
+												}
 											}
 										}
 									}
@@ -502,9 +507,47 @@ public class SISGlobalExecute {
 						BigDecimal qty = mapBJ.get(key).get("qty").abs();
 						totalAmt = totalAmt.add(qty.multiply(mapBJ.get(key).get("price")));
 					}
+					
+					BigDecimal qtyRM = new BigDecimal(0);
+					BigDecimal priceRM = new BigDecimal(0);
+					int productRM = 0;
 					for (String key: mapRM.keySet()) {
-						BigDecimal qty = mapRM.get(key).get("qty").abs();
-						totalAmt = totalAmt.add(qty.multiply(mapRM.get(key).get("price")));
+						if (priceRM.signum() == 0) {
+							priceRM = mapRM.get(key).get("price");
+						}
+						productRM = mapRM.get(key).get("m_product_id").intValue();
+						qtyRM = qtyRM.add(mapRM.get(key).get("qty"));
+					}
+					if (qtyRM.signum() < 0) {
+						for (String key: mapBK.keySet()) {
+							int bomID = Integer.valueOf(key.split(";")[1]);
+							for (RB_InventoryChargeBOM cb: param.getList_bom()) {
+								if (cb.getBom_id() == bomID) {
+									for (RB_InventoryChargeBOMMaterial cbm: cb.getList_material()) {
+										if (cbm.getM_product_id() == productRM) {
+											qtyRM = qtyRM.subtract(cbm.getQty().multiply(mapBK.get(key).get("qty")));
+										}
+									}
+								}
+							}
+						}
+					}
+					if (qtyRM.signum() < 0) {
+						for (String key: mapBJ.keySet()) {
+							int bomID = Integer.valueOf(key.split(";")[1]);
+							for (RB_InventoryChargeBOM cb: param.getList_bom()) {
+								if (cb.getBom_id() == bomID) {
+									for (RB_InventoryChargeBOMMaterial cbm: cb.getList_material()) {
+										if (cbm.getM_product_id() == productRM) {
+											qtyRM = qtyRM.subtract(cbm.getQty().multiply(mapBJ.get(key).get("qty")));
+										}
+									}
+								}
+							}
+						}
+					}
+					if (qtyRM.signum() < 0) {
+						totalAmt = totalAmt.add(qtyRM.abs().multiply(priceRM));
 					}
 					
 					Map<String, Object> mapResult = new HashMap<String, Object>();
