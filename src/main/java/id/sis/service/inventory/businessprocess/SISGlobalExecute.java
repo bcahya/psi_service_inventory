@@ -475,23 +475,38 @@ public class SISGlobalExecute {
 						if (mapBJTemp.get(key).get("qty").signum() > 0) {
 							mapBJ.remove(key);
 						} else {
-							int bomID = Integer.valueOf(key.split(";")[1]);
+							int productID = mapBJ.get(key).get("m_product_id").intValue();
 							for (String keyBK: mapBK.keySet()) {
-								int bomBKID = Integer.valueOf(keyBK.split(";")[1]);
-								if (bomID == bomBKID) {
-									int m_product_id = mapBJ.get(key).get("m_product_id").intValue();
-									for (RB_InventoryChargeBOM cb: param.getList_bom()) {
-										if (cb.getBom_id() == bomID) {
-											for (RB_InventoryChargeBOMMaterial cbm: cb.getList_material()) {
-												if (cbm.getM_product_id() == m_product_id) {
-													mapBJ.get(key).put("qty", mapBJ.get(key).get("qty")
-															.subtract(cbm.getQty().multiply(mapBK.get(keyBK).get("qty"))));
-												}
+								int bomID = Integer.valueOf(keyBK.split(";")[1]);
+								for (RB_InventoryChargeBOM cb: param.getList_bom()) {
+									if (cb.getBom_id() == bomID) {
+										for (RB_InventoryChargeBOMMaterial cbm: cb.getList_material()) {
+											if (cbm.getM_product_id() == productID) {
+												mapBJ.get(key).put("qty", mapBJ.get(key).get("qty")
+														.subtract(cbm.getQty().multiply(mapBK.get(keyBK).get("qty"))));
 											}
 										}
 									}
 								}
 							}
+							
+//							int bomID = Integer.valueOf(key.split(";")[1]);
+//							for (String keyBK: mapBK.keySet()) {
+//								int bomBKID = Integer.valueOf(keyBK.split(";")[1]);
+//								if (bomID == bomBKID) {
+//									int m_product_id = mapBJ.get(key).get("m_product_id").intValue();
+//									for (RB_InventoryChargeBOM cb: param.getList_bom()) {
+//										if (cb.getBom_id() == bomID) {
+//											for (RB_InventoryChargeBOMMaterial cbm: cb.getList_material()) {
+//												if (cbm.getM_product_id() == m_product_id) {
+//													mapBJ.get(key).put("qty", mapBJ.get(key).get("qty")
+//															.subtract(cbm.getQty().multiply(mapBK.get(keyBK).get("qty"))));
+//												}
+//											}
+//										}
+//									}
+//								}
+//							}
 							if (mapBJ.get(key).get("qty").signum() > 0) {
 								mapBJ.remove(key);
 							}
