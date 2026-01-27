@@ -409,7 +409,7 @@ public class SISGlobalExecute {
 						String key = String.valueOf(pd.getCategory_id())+";"+String.valueOf(pd.getSis_bomcharge_id());
 						BigDecimal qty = pd.getQty();
 						BigDecimal price = pd.getPrice();
-						if (pd.getCategory_seqno() == 10) {
+						if (pd.getCategory_seqno() == 30) {
 							if (!mapBK.containsKey(key)) {
 								HashMap<String, BigDecimal> mapAmt = new HashMap<>();
 								mapAmt.put("m_product_id", new BigDecimal(0));
