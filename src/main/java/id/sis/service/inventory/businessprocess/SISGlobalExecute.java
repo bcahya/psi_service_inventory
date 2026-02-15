@@ -1449,30 +1449,30 @@ public class SISGlobalExecute {
 		try {
 			String sql =
 					"select "
-					+ "	ad_client_id, "
-					+ "	ad_org_id, "
-					+ "	c_project_id, "
+					+ "	ad_client_id::int, "
+					+ "	ad_org_id::int, "
+					+ "	c_project_id::int, "
 					+ "	created, "
-					+ "	createdby, "
+					+ "	createdby::int, "
 					+ "	description, "
 					+ "	isactive, "
 					+ "	jsondata, "
 					+ "	name, "
 					+ "	sis_aggregatetype, "
-					+ "	sis_aggregate_id, "
+					+ "	sis_aggregate_id::int, "
 					+ "	sis_eventtype, "
 					+ "	sis_processedat, "
-					+ "	sis_retrycount, "
-					+ "	sis_syncstatus, "
-					+ "	sis_tempsync_01_id, "
+					+ "	0::int sis_retrycount, "
+					+ "	'CTD' sis_syncstatus, "
+					+ "	sis_tempsync_01_id::int, "
 					+ "	sis_tempsync_01_uu, "
 					+ "	updated, "
-					+ "	updatedby, "
-					+ "	user1_id, "
+					+ "	updatedby::int, "
+					+ "	user1_id::int, "
 					+ "	value "
 					+ "from "
-					+ "	sis_tempsync_01 ts "
-					+ "where ts.sis_syncstatus = 'CTD' ";
+					+ "	sis_tempsync_01 "
+					+ "where sis_syncstatus = 'CTD' ";
 			List<Map<String, Object>> resultList = source.queryForList(sql);
 			int totalUpdated = 0;
 			for (Map<String, Object> mapData: resultList) {
