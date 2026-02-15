@@ -8,6 +8,7 @@ import java.math.RoundingMode;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -1508,17 +1509,19 @@ public class SISGlobalExecute {
 						listValue.toArray()
 					);
 					
-					sql = "update sis_tempsync_01 set errormsg = '', sis_syncstatus='DNE' where sis_tempsync_01_uu = ? ";
+					sql = "update sis_tempsync_01 set errormsg = '', sis_processedat=?, sis_syncstatus='DNE' where sis_tempsync_01_uu = ? ";
 					source.update(
 							sql,
+							new Timestamp(new Date().getTime()),
 							uu
 						);
 					
 					totalUpdated += rowsAffected;
 				} catch (Exception e) {
-					sql = "update sis_tempsync_01 set sis_errormsg = '"+e.getMessage()+"' where sis_tempsync_01_uu = ? ";
+					sql = "update sis_tempsync_01 set errormsg = ?, sis_processedat=null  where sis_tempsync_01_uu = ? ";
 					int rowsAffected = source.update(
 							sql,
+							e.getMessage(),
 							uu
 						);
 				}
