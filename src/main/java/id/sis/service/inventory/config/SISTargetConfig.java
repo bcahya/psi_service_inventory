@@ -12,30 +12,30 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.atomikos.jdbc.AtomikosDataSourceBean;
 
-import id.sis.service.inventory.properties.SISSourceDataSourceProperties;
+import id.sis.service.inventory.properties.SISTargetDataSourceProperties;
 
 @Configuration
-@EnableConfigurationProperties(SISSourceDataSourceProperties.class)
-public class SISSourceConfig {
+@EnableConfigurationProperties(SISTargetDataSourceProperties.class)
+public class SISTargetConfig {
     @Autowired
-    SISSourceDataSourceProperties sisSourceDataSourceProperties;
+    SISTargetDataSourceProperties sisTargetDataSourceProperties;
 
-    @Bean(name = "sisSourceDataSource")
+    @Bean(name = "sisTargetDataSource")
     public DataSource sisDataSource() {
     	PGXADataSource pgXADataSource = new PGXADataSource();
-		 pgXADataSource.setUrl(sisSourceDataSourceProperties.getUrl());
-		 pgXADataSource.setPassword(sisSourceDataSourceProperties.getPassword());
-		 pgXADataSource.setUser(sisSourceDataSourceProperties.getUsername());
+		 pgXADataSource.setUrl(sisTargetDataSourceProperties.getUrl());
+		 pgXADataSource.setPassword(sisTargetDataSourceProperties.getPassword());
+		 pgXADataSource.setUser(sisTargetDataSourceProperties.getUsername());
 	
 		 AtomikosDataSourceBean xaDataSource = new AtomikosDataSourceBean();
 		 xaDataSource.setXaDataSource(pgXADataSource);
-		 xaDataSource.setUniqueResourceName("xads1");
-		 xaDataSource.setMaxPoolSize(Integer.valueOf(sisSourceDataSourceProperties.getMaxpool()));
+		 xaDataSource.setUniqueResourceName("xads2");
+		 xaDataSource.setMaxPoolSize(Integer.valueOf(sisTargetDataSourceProperties.getMaxpool()));
 		 return xaDataSource;
     }
 
-    @Bean(name = "jdbcTemplateSource")
-    public JdbcTemplate jdbcTemplate(@Qualifier(value = "sisSourceDataSource") DataSource dataSource) {
+    @Bean(name = "jdbcTemplateTarget")
+    public JdbcTemplate jdbcTemplate(@Qualifier(value = "sisTargetDataSource") DataSource dataSource) {
         return new JdbcTemplate(dataSource);
     }
 }

@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import id.sis.service.inventory.businessprocess.SISApi;
@@ -50,6 +51,12 @@ public class SISServiceImpl{
 	public SISResponse importTrans() throws Exception {
         logger.info("execute importTrans");
         return ex.importTrans();
+    }
+	
+	@Scheduled(cron = "0 */10 * * * *")
+	public SISResponse processSync01() throws Exception {
+        logger.info("execute processSync01");
+        return ex.processSync01();
     }
 
 //    @Scheduled(cron = "0 */10 * * * *")

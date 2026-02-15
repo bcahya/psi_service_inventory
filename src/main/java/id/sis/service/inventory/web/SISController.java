@@ -125,4 +125,20 @@ public class SISController {
 
 		return response;
 	}
+	
+	@ResponseBody
+	@RequestMapping(value = "/processSync01", method = RequestMethod.POST)
+	SISResponse processSync01(
+//			@RequestParam("m_inventory_id") Integer m_inventory_id
+			) {
+		SISResponse response = new SISResponse();
+
+		try {
+			response = sisService.processSync01();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		return response;
+	}
 }

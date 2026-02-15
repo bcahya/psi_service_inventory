@@ -52,8 +52,12 @@ public class SISGlobalExecute {
 	String sql = "";
     
 	@Autowired
-	@Qualifier("jdbcTemplateCdcSource")
+	@Qualifier("jdbcTemplateSource")
 	private JdbcTemplate source;
+	
+	@Autowired
+	@Qualifier("jdbcTemplateTarget")
+	private JdbcTemplate target;
 
 	@Autowired
 	private SISIdProperties sisIdProperties;
@@ -63,100 +67,6 @@ public class SISGlobalExecute {
 
 	SISUtil u = new SISUtil(source, sisIdProperties, transactionManager);
 	
-
-//	@Transactional(rollbackFor = Exception.class)
-//	public SISResponse executeFWspCreateMaterialEDX(String name) throws Exception {
-//		SISResponse response = new SISResponse();
-//
-//		try {
-//			String edxIdMaterial = UUID.randomUUID().toString().toUpperCase();
-//			String itemIdMaterial = UUID.randomUUID().toString().toUpperCase();
-//			String sqlMaterial = "exec FWsp_CreateMATERIALEDX " +
-//				"@EDXID = '" + edxIdMaterial + "'" +
-//				", @ItemID = '" + itemIdMaterial + "'" +
-//				", @Item_Code = 'RM-22 " + name + "'" +
-//				", @Description = 'RM-22 " + name + "'" +
-//				", @Internal_UOM = 'kg'" +
-//				", @Item_Group_Code = '1 AGG'" +
-//				", @CompanyID = '" + sisIdProperties.getCompanyid() + "'" +
-//				", @LocationID = '" + sisIdProperties.getLocationid() + "'" +
-//				", @PlantID = '" + sisIdProperties.getPlantid() + "'" +
-//				", @Item_Group_type = 'T'"; 
-//			source.execute(sqlMaterial);
-//			logger.info("material edx created");
-//
-//			String edxIdMix = UUID.randomUUID().toString().toUpperCase();
-//			String itemIdMix = UUID.randomUUID().toString().toUpperCase();
-//			String sqlMix = "exec FWsp_CreateMIXEDX " +
-//				"@EDXID = '" + edxIdMix + "'" +
-//				", @ItemID = '" + itemIdMix + "'" +
-//				", @Item_Code = 'RMX-K22 " + name + "'" +
-//				", @Description = 'RMX-K22 " + name + "'" +
-//				", @Internal_UOM = 'm3'" +
-//				", @CompanyID  = '" + sisIdProperties.getCompanyid() + "'" +
-//				", @LocationID = '" + sisIdProperties.getLocationid() + "'" +
-//				", @PlantID    = '" + sisIdProperties.getPlantid() + "'" +
-//				", @Max_Batch_Size_UOM = 'm3'" +
-//				", @ItemType = 'M'" +
-//				", @Track_Usage_Flag = 1" +
-//				", @Trade_Discount_Flag = 0";
-//			source.execute(sqlMix);
-//			logger.info("mix edx created");
-//
-//			String sqlMixIngre = "exec FWsp_CreateMIXIngredientEDX " +
-//				"@MixEDXID = '" + edxIdMix + "'" +
-//				", @IngredItemID = '" + itemIdMaterial + "'" +
-//				", @MixCode = ''" +
-//				", @IngredCode= ''" +
-//				", @LocationID = '" + sisIdProperties.getLocationid() + "'" +
-//				", @Entry_Qty = 15000" +
-//				", @Entry_UOM = 'kg'" +
-//				", @Item_Type = 'M'" +
-//				", @Based_On_Qty = 17";
-//			source.execute(sqlMixIngre);
-//			logger.info("mix ingredient line created");
-//
-//			String orderId = UUID.randomUUID().toString();
-//			String sqlOrder = "exec FWsp_CreateOrderEDX " +
-//				"@EDXID = '" + edxIdMix + "'" +
-//				", @CompanyID  = '" + sisIdProperties.getCompanyid() + "'" +
-//				", @LocationID = '" + sisIdProperties.getLocationid() + "'" +
-//				", @Order_Code = 'STO-2024.C'" +
-//				", @OrderID = '" + orderId + "'" +
-//				", @CustomerID = 'B6C005F2-8A28-4E05-9DE1-7C049889D176'" +
-//				", @PO_Num = 'PO-2024'" +
-//				", @Address_Line1 = 'Jl. Melati No.1'" +
-//				", @Address_Line2 = 'Kec.Manyar, Kab.Gresik'" +
-//				", @Address_Line3 = 'Jawa Timur'" +
-//				", @Req_First_Load_On_Job_TDS = '2024-03-04'";
-//			source.execute(sqlOrder);
-//
-//			String orderLineId = UUID.randomUUID().toString();
-//			String sqlOrderLine = "exec FWsp_CreateOrderLineEDX " +
-//				"@Order_LineID = '" + orderLineId + "'" +
-//				", @OrderID = '" + orderId + "'" +
-//				", @ItemID = '" + itemIdMix + "'" +
-//				", @Load_Size = '6'" +
-//				", @Ordered_Qty = '6'" +
-//				", @Ordered_Qty_UOM = 'm3'" +
-//				", @Sort_Line_Num='0'";
-//			source.execute(sqlOrderLine);
-//
-//			response.setStatus("S");
-//			response.setMessage("Material RM-22 " + name + " created");
-//			logger.info("Create material Success");
-//		} catch (Exception e) {
-//			response.setStatus("E");
-//			response.setMessage("Create material Failed: " + e.getMessage());
-//			logger.info(e.getMessage());
-//			throw new Exception(e.getMessage());
-//		}
-//
-//		return response;
-//	}
-//
-//	
-//
 	public SISResponse calculateInventoryBook(Integer m_inventoryline_id) throws Exception {
 		logger.info("[SIS] calculateInventoryBook m_inventoryline_id : " + m_inventoryline_id.toString());
 		SISResponse response = new SISResponse();
@@ -1530,6 +1440,98 @@ public class SISGlobalExecute {
 			}
 		}
 		return id;
+	}
+	
+	public SISResponse processSync01() throws Exception {
+		logger.info("[SIS] processSync01 ");
+		SISResponse response = new SISResponse();
+		try {
+			String sql =
+					"select "
+					+ "	ad_client_id, "
+					+ "	ad_org_id, "
+					+ "	c_project_id, "
+					+ "	created, "
+					+ "	createdby, "
+					+ "	description, "
+					+ "	isactive, "
+					+ "	jsondata, "
+					+ "	name, "
+					+ "	sis_aggregatetype, "
+					+ "	sis_aggregate_id, "
+					+ "	sis_eventtype, "
+					+ "	sis_processedat, "
+					+ "	sis_retrycount, "
+					+ "	sis_syncstatus, "
+					+ "	sis_tempsync_01_id, "
+					+ "	sis_tempsync_01_uu, "
+					+ "	updated, "
+					+ "	updatedby, "
+					+ "	user1_id, "
+					+ "	value "
+					+ "from "
+					+ "	sis_tempsync_01 ts "
+					+ "where ts.sis_syncstatus = 'CTD' ";
+			List<Map<String, Object>> resultList = source.queryForList(sql);
+			int totalUpdated = 0;
+			for (Map<String, Object> mapData: resultList) {
+				String uu = (String)mapData.get("sis_tempsync_01_uu");
+				try {
+					List<Object> listValue = new ArrayList<>();
+					List<String> listColName = new ArrayList<>();
+					String cols = "";
+					String colParam = "";
+					for (String colName: mapData.keySet()) {
+						listColName.add(colName);
+						if (!cols.equalsIgnoreCase("")) {
+							cols += ",";
+							colParam += ",";
+						}
+						cols += colName;
+						colParam += "?";
+						listValue.add(mapData.get(colName));
+					}
+					
+					sql =
+						"select  "
+						+ "	count(*)::int total "
+						+ "from sis_tempsync_01 ts "
+						+ "where ts.sis_tempsync_01_uu = '"+(String)mapData.get("sis_tempsync_01_uu")+"' ";
+					resultList = source.queryForList(sql);
+					if (resultList.size() > 0) {
+						throw new Exception("Already sync!");
+					}
+					
+					sql = "insert into sis_tempsync_01 ( "+cols+ ") values ( "+colParam+") ";
+					int rowsAffected = target.update(
+						sql,
+						listValue.toArray()
+					);
+					
+					sql = "update sis_tempsync_01 set errormsg = '', sis_syncstatus='DNE' where sis_tempsync_01_uu = ? ";
+					source.update(
+							sql,
+							uu
+						);
+					
+					totalUpdated += rowsAffected;
+				} catch (Exception e) {
+					sql = "update sis_tempsync_01 set sis_errormsg = '"+e.getMessage()+"' where sis_tempsync_01_uu = ? ";
+					int rowsAffected = source.update(
+							sql,
+							uu
+						);
+				}
+			}
+			List<Map<String, Object>> listData = new ArrayList<Map<String,Object>>();
+			Map<String, Object> mapData = new LinkedHashMap<String, Object>();
+			mapData.put("total_updated", totalUpdated);
+			listData.add(mapData);
+			response = SISResponse.successResponse(listData);
+		} catch (Exception e) {
+			response = SISResponse.errorResponse(e.getMessage());
+		}
+		return response;
 	}
 	
 }
