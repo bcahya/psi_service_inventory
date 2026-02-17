@@ -141,4 +141,20 @@ public class SISController {
 
 		return response;
 	}
+	
+	@ResponseBody
+	@RequestMapping(value = "/generateDoc01", method = RequestMethod.POST)
+	SISResponse generateDoc01(
+//			@RequestParam("m_inventory_id") Integer m_inventory_id
+			) {
+		SISResponse response = new SISResponse();
+
+		try {
+			response = sisService.generateDoc01();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		return response;
+	}
 }

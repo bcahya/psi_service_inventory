@@ -12,14 +12,17 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -361,5 +364,130 @@ public class SISUtil {
 			}
         }
         return listBSID;
+	}
+	
+	public int dynamicInsert(
+			JdbcTemplate target,
+			String tableName,
+			Map<String, Object> mapData
+		) {
+		List<Object> listValue = new ArrayList<>();
+		List<String> listColName = new ArrayList<>();
+		String cols = "";
+		String colParam = "";
+		for (String colName: mapData.keySet()) {
+			listColName.add(colName);
+			if (!cols.equalsIgnoreCase("")) {
+				cols += ",";
+				colParam += ",";
+			}
+			cols += colName;
+			colParam += "?";
+			listValue.add(mapData.get(colName));
+		}
+		String sql = "insert into "+tableName+" ( "+cols+ ") values ( "+colParam+") ";
+		return target.update(
+			sql,
+			listValue.toArray()
+		);
+	}
+	
+	public int insertDoc01(
+			JdbcTemplate target,
+			JSONObject jo) {
+		List<HashMap<String, Object>> listSQL = new ArrayList<>();
+		generateInsertSQL01(target, jo, listSQL);
+		
+		//sort desc
+		Collections.reverse(listSQL);
+		int totalInserted = 0;
+		for (HashMap<String, Object> mapSQL: listSQL) {
+			int exec = target.update(
+					(String)mapSQL.get("sql"),
+					((List<Object>)mapSQL.get("params")).toArray()
+				);
+			totalInserted += exec;
+		}
+		return totalInserted;
+	}
+	
+	public void generateInsertSQL01(
+		JdbcTemplate target,
+		JSONObject jo,
+		List<HashMap<String, Object>> listSQL
+			) {
+		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.S");
+		SimpleDateFormat sdf2 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+		try {
+			String tableName = jo.getString("table_name");
+			
+			List<String> listColName = new ArrayList<>();
+			List<Object> params = new ArrayList<>();
+			Iterator<String> it = jo.keys();
+			String colUU = "";
+			while (it.hasNext()) {
+			    String key = it.next();
+			    if (key.toUpperCase().endsWith("_UU")) {
+			    	colUU = key;
+			    }
+			    if (key.equalsIgnoreCase("table_name")) {
+			    	continue;
+			    }
+			    if (key.startsWith("list_")) {
+		    		JSONArray ja = jo.getJSONArray(key);
+					for (int a=0; a<ja.length(); a++) {
+						generateInsertSQL01(target, ja.getJSONObject(a), listSQL);
+					}
+					continue;
+			    }
+			    listColName.add(key);
+			    
+			    Timestamp ts = null;
+			    Object o = jo.get(key);
+			    if (o instanceof String) {
+			    	try {
+			    		String dates = (String)o;
+			    		ts = new Timestamp(sdf.parse(dates).getTime());
+			    		params.add(ts);
+			    	} catch (Exception e) {
+			    		try {
+				    		String dates = (String)o;
+				    		ts = new Timestamp(sdf2.parse(dates).getTime());
+				    		params.add(ts);
+				    	} catch (Exception e1) {
+						}
+					}
+			    }
+			    if (ts == null) {
+				    params.add(o);
+			    }
+			}
+			
+			String sqlCek = "select count(*)::int total from "+tableName+" where "+colUU+"='"+jo.getString(colUU)+"' ";
+			List<Map<String, Object>> resultList = target.queryForList(sqlCek);
+			if ((int)resultList.get(0).get("total") > 0) {
+				return;
+			}
+			
+			String cols = "";
+			String pars = "";
+			for (int a=0; a<listColName.size(); a++) {
+				if (a > 0) {
+					cols += ",";
+					pars += ",";
+				}
+				cols += listColName.get(a);
+				pars += "?";
+			}
+			
+			String sql = "insert into "+tableName+"("+cols+") values("+pars+")";
+			HashMap<String, Object> mapSQL = new HashMap<>();
+			mapSQL.put("sql", sql);
+			mapSQL.put("params", params);
+			listSQL.add(mapSQL);
+				
+		} catch (JSONException e) {
+			e.printStackTrace();
+		}
 	}
 }

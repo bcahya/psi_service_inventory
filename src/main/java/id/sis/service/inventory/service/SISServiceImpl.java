@@ -58,6 +58,12 @@ public class SISServiceImpl{
         logger.info("execute processSync01");
         return ex.processSync01();
     }
+	
+	@Scheduled(cron = "0 */10 * * * *")
+	public SISResponse generateDoc01() throws Exception {
+        logger.info("execute generateDoc01");
+        return ex.generateDoc01();
+    }
 
 //    @Scheduled(cron = "0 */10 * * * *")
 //    @Transactional(rollbackFor = Exception.class)

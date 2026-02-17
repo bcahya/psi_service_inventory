@@ -11,12 +11,15 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -1472,43 +1475,23 @@ public class SISGlobalExecute {
 					+ "	value "
 					+ "from "
 					+ "	sis_tempsync_01 "
-					+ "where sis_syncstatus = 'CTD' ";
+					+ "where sis_syncstatus = 'CTD' "
+					+ "order by sis_tempsync_01_id asc ";
 			List<Map<String, Object>> resultList = source.queryForList(sql);
 			int totalUpdated = 0;
 			for (Map<String, Object> mapData: resultList) {
 				String uu = (String)mapData.get("sis_tempsync_01_uu");
 				try {
-					List<Object> listValue = new ArrayList<>();
-					List<String> listColName = new ArrayList<>();
-					String cols = "";
-					String colParam = "";
-					for (String colName: mapData.keySet()) {
-						listColName.add(colName);
-						if (!cols.equalsIgnoreCase("")) {
-							cols += ",";
-							colParam += ",";
-						}
-						cols += colName;
-						colParam += "?";
-						listValue.add(mapData.get(colName));
-					}
-					
 					sql =
 						"select  "
 						+ "	count(*)::int total "
 						+ "from sis_tempsync_01 ts "
 						+ "where ts.sis_tempsync_01_uu = '"+(String)mapData.get("sis_tempsync_01_uu")+"' ";
-					resultList = source.queryForList(sql);
-					if (resultList.size() > 0) {
+					resultList = target.queryForList(sql);
+					if ((int)resultList.get(0).get("total") > 0) {
 						throw new Exception("Already sync!");
 					}
-					
-					sql = "insert into sis_tempsync_01 ( "+cols+ ") values ( "+colParam+") ";
-					int rowsAffected = target.update(
-						sql,
-						listValue.toArray()
-					);
-					
+					int rowsAffected = u.dynamicInsert(target, "sis_tempsync_01", mapData);
 					sql = "update sis_tempsync_01 set errormsg = '', sis_processedat=?, sis_syncstatus='DNE' where sis_tempsync_01_uu = ? ";
 					source.update(
 							sql,
@@ -1529,6 +1512,74 @@ public class SISGlobalExecute {
 			List<Map<String, Object>> listData = new ArrayList<Map<String,Object>>();
 			Map<String, Object> mapData = new LinkedHashMap<String, Object>();
 			mapData.put("total_updated", totalUpdated);
+			listData.add(mapData);
+			response = SISResponse.successResponse(listData);
+		} catch (Exception e) {
+			response = SISResponse.errorResponse(e.getMessage());
+		}
+		return response;
+	}
+	
+	public SISResponse generateDoc01() throws Exception {
+		logger.info("[SIS] generateDoc01 ");
+		SISResponse response = new SISResponse();
+		try {
+			String sql =
+					"select "
+					+ "	ad_client_id::int, "
+					+ "	ad_org_id::int, "
+					+ "	c_project_id::int, "
+					+ "	created, "
+					+ "	createdby::int, "
+					+ "	description, "
+					+ "	isactive, "
+					+ "	jsondata::text, "
+					+ "	name, "
+					+ "	sis_aggregatetype, "
+					+ "	sis_aggregate_id::int, "
+					+ "	sis_eventtype, "
+					+ "	sis_processedat, "
+					+ "	0::int sis_retrycount, "
+					+ "	'CTD' sis_syncstatus, "
+					+ "	sis_tempsync_01_id::int, "
+					+ "	sis_tempsync_01_uu, "
+					+ "	updated, "
+					+ "	updatedby::int, "
+					+ "	user1_id::int, "
+					+ "	value "
+					+ "from "
+					+ "	sis_tempsync_01 "
+					+ "where sis_syncstatus = 'CTD' "
+					+ "order by sis_tempsync_01_id asc ";
+			List<Map<String, Object>> resultList = target.queryForList(sql);
+			int totalGenerated = 0;
+			for (Map<String, Object> mapData: resultList) {
+				String uu = (String)mapData.get("sis_tempsync_01_uu");
+				try {
+					JSONObject jo = new JSONObject((String)mapData.get("jsondata"));
+					int totalInsert = u.insertDoc01(target, jo);
+					if (totalInsert > 0) {
+						totalGenerated += 1;
+					}
+					sql = "update sis_tempsync_01 set errormsg = '', sis_processedat=?, sis_syncstatus='DNE' where sis_tempsync_01_uu = ? ";
+					target.update(
+							sql,
+							new Timestamp(new Date().getTime()),
+							uu
+						);
+					
+				} catch (Exception e) {
+					sql = "update sis_tempsync_01 set errormsg = ?, sis_processedat=null  where sis_tempsync_01_uu = ? ";
+					int rowsAffected = target.update(
+							sql,
+							e.getMessage(),
+							uu
+						);
+				}
+			}
+			List<Map<String, Object>> listData = new ArrayList<Map<String,Object>>();
+			Map<String, Object> mapData = new LinkedHashMap<String, Object>();
+			mapData.put("total_updated", totalGenerated);
 			listData.add(mapData);
 			response = SISResponse.successResponse(listData);
 		} catch (Exception e) {
