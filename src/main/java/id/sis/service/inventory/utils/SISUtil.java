@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.security.MessageDigest;
 import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -490,4 +491,10 @@ public class SISUtil {
 			e.printStackTrace();
 		}
 	}
+	
+	public static String encryptSHA256(String input) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        byte[] hash = digest.digest(input.getBytes());
+        return java.util.HexFormat.of().formatHex(hash);
+    }
 }
