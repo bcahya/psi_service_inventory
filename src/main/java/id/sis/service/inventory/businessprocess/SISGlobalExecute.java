@@ -27,6 +27,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import id.sis.service.inventory.pojo.RB_InventoryCharge;
 import id.sis.service.inventory.pojo.RB_InventoryChargeBOM;
@@ -62,7 +64,16 @@ public class SISGlobalExecute {
 	@Autowired
 	@Qualifier("jdbcTemplateTarget")
 	private JdbcTemplate target;
+	
+	@Autowired
+	@Qualifier("targetTxManager")
+	private PlatformTransactionManager targetTxManager;
 
+	@Autowired
+	@Qualifier("sourceTxManager")
+	private PlatformTransactionManager sourceTxManager;
+
+	
 	@Autowired
 	private SISIdProperties sisIdProperties;
 	
@@ -1446,27 +1457,79 @@ public class SISGlobalExecute {
 		return id;
 	}
 	
+	//get list data
+	/////////////////////
+	@Transactional(
+			transactionManager = "sourceTxManager",
+		    rollbackFor = Exception.class,
+	        propagation = Propagation.REQUIRES_NEW
+	)
+	int getCountSource01(
+			String whereCond
+			){
+		return getCount01(source, whereCond);
+	}
+	
+	@Transactional(
+			transactionManager = "targetTxManager",
+		    rollbackFor = Exception.class,
+	        propagation = Propagation.REQUIRES_NEW
+	)
+	int getCountTarget01(
+			String whereCond
+			){
+		return getCount01(target, whereCond);
+	}
+	
+	int getCount01(
+			JdbcTemplate jdbc,
+			String whereCond
+			){
+		String sql = 
+				"select "
+				+ "	count(*)::int total "
+				+ "from "
+				+ "	sis_tempsync_01 "
+				+ whereCond;
+		return (int)jdbc.queryForList(sql).get(0).get("total");
+	}
+	/////////////////////////////////
+	
 	public SISResponse processSync01() throws Exception {
 		logger.info("[SIS] processSync01 ");
 		SISResponse response = new SISResponse();
 		try {
 			String whereCond = "where sis_syncstatus = 'CTD' ";
-			String sql = 
-					"select "
-					+ "	count(*)::int total "
-					+ "from "
-					+ "	sis_tempsync_01 "
-					+ whereCond;
-			int totalData = (int)source.queryForList(sql).get(0).get("total");
+			int totalData = getCount01(source, whereCond);
 			int totalUpdated = 0;
 			int totalFetch = 100;
 			if (totalData > 0) {
 				int totalLoop = (totalData + totalFetch -1) / totalFetch;
 				for (int a=0; a<totalLoop; a++) {
-					try {
-						totalUpdated = totalUpdated + execProcessSync01(totalFetch, whereCond);
-					} catch (Exception e) {
-					}
+					List<Map<String, Object>> resultList = getListMap01(source, totalFetch, whereCond);
+					
+					TransactionTemplate tt = new TransactionTemplate(targetTxManager);
+					List<HashMap<String, String>> listUpdates = tt.execute(s -> {
+						List<HashMap<String, String>> listUpdate = new ArrayList<>();
+						try {
+							listUpdate = execProcessSync01(resultList, totalFetch, whereCond);
+						} catch (Exception e) {
+						}
+						return listUpdate;
+					});
+					
+					TransactionTemplate ts = new TransactionTemplate(sourceTxManager);
+					totalUpdated = totalUpdated + ts.execute(s -> {
+						int total = 0;
+						for (HashMap<String, String> mapUpdate : listUpdates) {
+							boolean isError = mapUpdate.get("is_error").equalsIgnoreCase("Y");
+							updateStatus01(source, mapUpdate.get("uu"), isError, mapUpdate.get("errormsg"));
+							if (!isError) {
+								total += 1;
+							}
+						}
+						return total;
+					});
 				}
 			}
 			
@@ -1481,95 +1544,165 @@ public class SISGlobalExecute {
 		return response;
 	}
 	
-	@Transactional(propagation = Propagation.REQUIRES_NEW)
-	int execProcessSync01(
+	//get list data
+	/////////////////////
+	List<Map<String, Object>> getListMap01(
+			JdbcTemplate jdbc,
 			int totalFetch,
 			String whereCond
-		) {
+			){
+		String sql =
+				"select "
+				+ "	ad_client_id::int, "
+				+ "	ad_org_id::int, "
+				+ "	c_project_id::int, "
+				+ "	created, "
+				+ "	createdby::int, "
+				+ "	description, "
+				+ "	isactive, "
+				+ "	jsondata, "
+				+ "	name, "
+				+ "	sis_aggregatetype, "
+				+ "	sis_aggregate_id::int, "
+				+ "	sis_eventtype, "
+				+ "	sis_processedat, "
+				+ "	0::int sis_retrycount, "
+				+ "	'CTD' sis_syncstatus, "
+				+ "	sis_tempsync_01_id::int, "
+				+ "	sis_tempsync_01_uu, "
+				+ "	updated, "
+				+ "	updatedby::int, "
+				+ "	user1_id::int, "
+				+ "	value, "
+				+ "	sis_checksum "
+				+ "from "
+				+ "	sis_tempsync_01 "
+				+ whereCond
+				+ " order by sis_tempsync_01_id asc "
+				+ "fetch first "+totalFetch+" rows only for update ";
+		return jdbc.queryForList(sql);
+	}
+	/////////////////////////////////
+	
+	List<HashMap<String, String>> execProcessSync01(
+			List<Map<String, Object>> resultList,
+			int totalFetch,
+			String whereCond
+		) throws Exception {
+		List<HashMap<String, String>> listUpdate = new ArrayList<>();
+		HashMap<String, String> mapUpdate = new HashMap<>();
 		int totalUpdated = 0;
-		try {
-			String sql =
-					"select "
-					+ "	ad_client_id::int, "
-					+ "	ad_org_id::int, "
-					+ "	c_project_id::int, "
-					+ "	created, "
-					+ "	createdby::int, "
-					+ "	description, "
-					+ "	isactive, "
-					+ "	jsondata, "
-					+ "	name, "
-					+ "	sis_aggregatetype, "
-					+ "	sis_aggregate_id::int, "
-					+ "	sis_eventtype, "
-					+ "	sis_processedat, "
-					+ "	0::int sis_retrycount, "
-					+ "	'CTD' sis_syncstatus, "
-					+ "	sis_tempsync_01_id::int, "
-					+ "	sis_tempsync_01_uu, "
-					+ "	updated, "
-					+ "	updatedby::int, "
-					+ "	user1_id::int, "
-					+ "	value, "
-					+ "	sis_checksum "
-					+ "from "
-					+ "	sis_tempsync_01 "
-					+ whereCond
-					+ " order by sis_tempsync_01_id asc "
-					+ "fetch first "+totalFetch+" rows only for update ";
-			List<Map<String, Object>> resultList = source.queryForList(sql);
-			for (Map<String, Object> mapData: resultList) {
-				String uu = (String)mapData.get("sis_tempsync_01_uu");
-				String checksumInternal = (String)mapData.get("sis_checksum");
-				try {
-					sql =
-						"select  "
-						+ "	count(*)::int total "
-						+ "from sis_tempsync_01 ts "
-						+ "where ts.sis_tempsync_01_uu = '"+uu+"' ";
-					resultList = target.queryForList(sql);
-					if ((int)resultList.get(0).get("total") > 0) {
-						throw new Exception("Already sync!");
-					}
-					int rowsAffected = u.dynamicInsert(target, "sis_tempsync_01", mapData);
-					
-					//checksum
-					sql =
-						"select  "
-						+ "	jsondata::text "
-						+ "from sis_tempsync_01 ts "
-						+ "where ts.sis_tempsync_01_uu = '"+uu+"' ";
-					resultList = target.queryForList(sql);
-					String jo = (String)resultList.get(0).get("jsondata");
-					if (!checksumInternal.equalsIgnoreCase(SISUtil.encryptSHA256(jo))) {
-						throw new Exception("Checksum not valid!");
-					}
-					
-					sql = "update sis_tempsync_01 set errormsg = '', sis_processedat=?, sis_syncstatus='DNE' where sis_tempsync_01_uu = ? ";
-					source.update(
-							sql,
-							new Timestamp(new Date().getTime()),
-							uu
-						);
-					
-					totalUpdated += rowsAffected;
-				} catch (Exception e) {
-					sql = "update sis_tempsync_01 set errormsg = ?, sis_processedat=null  where sis_tempsync_01_uu = ? ";
-					int rowsAffected = source.update(
-							sql,
-							e.getMessage(),
-							uu
-						);
+		for (Map<String, Object> mapData: resultList) {
+			String uu = (String)mapData.get("sis_tempsync_01_uu");
+			String checksumInternal = (String)mapData.get("sis_checksum");
+			mapUpdate = new HashMap<>();
+			mapUpdate.put("uu", uu);
+			mapUpdate.put("is_error", "N");
+			mapUpdate.put("errormsg", "");
+			try {
+				sql =
+					"select  "
+					+ "	count(*)::int total "
+					+ "from sis_tempsync_01 ts "
+					+ "where ts.sis_tempsync_01_uu = '"+uu+"' ";
+				resultList = target.queryForList(sql);
+				if ((int)resultList.get(0).get("total") > 0) {
+					throw new Exception("Already sync!");
 				}
+				int rowsAffected = u.dynamicInsert(target, "sis_tempsync_01", mapData);
+				
+				//checksum
+				sql =
+					"select  "
+					+ "	jsondata::text "
+					+ "from sis_tempsync_01 ts "
+					+ "where ts.sis_tempsync_01_uu = '"+uu+"' ";
+				resultList = target.queryForList(sql);
+				if (resultList.size() <= 0) {
+					throw new Exception("data not inserted!");
+				}
+				String jo = (String)resultList.get(0).get("jsondata");
+				if (!checksumInternal.equalsIgnoreCase(SISUtil.encryptSHA256(jo))) {
+					throw new Exception("Checksum not valid!");
+				}
+				totalUpdated += rowsAffected;
+			} catch (Exception e) {
+				mapUpdate.put("is_error", "Y");
+				mapUpdate.put("errormsg", e.getMessage());
 			}
-		} catch (Exception e) {
-			totalUpdated = 0;
-			throw new RuntimeException(e.getMessage());
+			listUpdate.add(mapUpdate);
 		}
-		return totalUpdated;
+		
+		return listUpdate;
 	}
 	
-	@Transactional(propagation = Propagation.REQUIRES_NEW)
+	
+	//update status
+	//////////////////////
+	void updateStatus01 (
+			JdbcTemplate jdbc,
+			String uu,
+			boolean isError,
+			String errorMsg
+			) {
+		if (!isError) {
+			sql = "update sis_tempsync_01 set errormsg = '', sis_processedat=?, sis_syncstatus='DNE' where sis_tempsync_01_uu = ? ";
+			jdbc.update(
+					sql,
+					new Timestamp(new Date().getTime()),
+					uu
+				);
+		} else {
+			sql = "update sis_tempsync_01 set errormsg = ?, sis_processedat=null  where sis_tempsync_01_uu = ? ";
+			jdbc.update(
+					sql,
+					errorMsg,
+					uu
+				);
+		}
+	}
+	//////////////////
+	
+	
+	public SISResponse generateDoc01() throws Exception {
+		logger.info("[SIS] generateDoc01 ");
+		SISResponse response = new SISResponse();
+		try {
+			String whereCond = "where sis_syncstatus = 'CTD' ";
+			String sql = 
+					"select "
+					+ "	count(*)::int total "
+					+ "from "
+					+ "	sis_tempsync_01 "
+					+ whereCond;
+			int totalData = (int)target.queryForList(sql).get(0).get("total");
+			int totalUpdated = 0;
+			int totalFetch = 100;
+			if (totalData > 0) {
+				int totalLoop = (totalData + totalFetch -1) / totalFetch;
+				for (int a=0; a<totalLoop; a++) {
+					TransactionTemplate tt = new TransactionTemplate(targetTxManager);
+					totalUpdated = totalUpdated +tt.execute(s -> {
+						int total = 0;
+						try {
+							total = execGenerateDoc01(totalFetch, whereCond);
+						} catch (Exception e) {
+						}
+						return total;
+					});
+				}
+			}
+			List<Map<String, Object>> listData = new ArrayList<Map<String,Object>>();
+			Map<String, Object> mapData = new LinkedHashMap<String, Object>();
+			mapData.put("total_updated", totalUpdated);
+			listData.add(mapData);
+			response = SISResponse.successResponse(listData);
+		} catch (Exception e) {
+			response = SISResponse.errorResponse(e.getMessage());
+		}
+		return response;
+	}
+	
 	int execGenerateDoc01(
 			int totalFetch,
 			String whereCond
@@ -1607,67 +1740,25 @@ public class SISGlobalExecute {
 			List<Map<String, Object>> resultList = target.queryForList(sql);
 			for (Map<String, Object> mapData: resultList) {
 				String uu = (String)mapData.get("sis_tempsync_01_uu");
+				boolean isError = false;
+				String errorMsg = "";
 				try {
 					JSONObject jo = new JSONObject((String)mapData.get("jsondata"));
 					int totalInsert = u.insertDoc01(target, jo);
 					if (totalInsert > 0) {
 						totalUpdated += 1;
 					}
-					sql = "update sis_tempsync_01 set errormsg = '', sis_processedat=?, sis_syncstatus='DNE' where sis_tempsync_01_uu = ? ";
-					target.update(
-							sql,
-							new Timestamp(new Date().getTime()),
-							uu
-						);
-					
 				} catch (Exception e) {
-					sql = "update sis_tempsync_01 set errormsg = ?, sis_processedat=null  where sis_tempsync_01_uu = ? ";
-					int rowsAffected = target.update(
-							sql,
-							e.getMessage(),
-							uu
-						);
+					isError = true;
+					errorMsg = e.getMessage();
 				}
+				updateStatus01(target, uu, isError, errorMsg);
 			}
 		} catch (Exception e) {
 			totalUpdated = 0;
 			throw new RuntimeException(e.getMessage());
 		}
 		return totalUpdated;
-	}
-	
-	public SISResponse generateDoc01() throws Exception {
-		logger.info("[SIS] generateDoc01 ");
-		SISResponse response = new SISResponse();
-		try {
-			String whereCond = "where sis_syncstatus = 'CTD' ";
-			String sql = 
-					"select "
-					+ "	count(*)::int total "
-					+ "from "
-					+ "	sis_tempsync_01 "
-					+ whereCond;
-			int totalData = (int)target.queryForList(sql).get(0).get("total");
-			int totalUpdated = 0;
-			int totalFetch = 100;
-			if (totalData > 0) {
-				int totalLoop = (totalData + totalFetch -1) / totalFetch;
-				for (int a=0; a<totalLoop; a++) {
-					try {
-						totalUpdated = totalUpdated + execGenerateDoc01(totalFetch, whereCond);
-					} catch (Exception e) {
-					}
-				}
-			}
-			List<Map<String, Object>> listData = new ArrayList<Map<String,Object>>();
-			Map<String, Object> mapData = new LinkedHashMap<String, Object>();
-			mapData.put("total_updated", totalUpdated);
-			listData.add(mapData);
-			response = SISResponse.successResponse(listData);
-		} catch (Exception e) {
-			response = SISResponse.errorResponse(e.getMessage());
-		}
-		return response;
 	}
 	
 }
