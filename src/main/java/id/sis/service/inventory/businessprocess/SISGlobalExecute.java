@@ -1026,7 +1026,9 @@ public class SISGlobalExecute {
 								}
 								if (qtyDiff.signum() < 0) {
 									generateReqSC(rbReq, bl.getProduct_id(), locSearchID, rbRL.getWarehouse_id(), qtyDiff.abs(), listReq);
-									soh.setQty(new BigDecimal(0));
+									if (soh != null) {
+										soh.setQty(new BigDecimal(0));
+									}
 								}
 							} else {
 								LinkedHashMap<String, Object> mapPOP = new LinkedHashMap<String, Object>();
