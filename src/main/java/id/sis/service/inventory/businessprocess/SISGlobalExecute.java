@@ -1680,18 +1680,33 @@ public class SISGlobalExecute {
 			int totalFetch = 100;
 			if (totalData > 0) {
 				int totalLoop = (totalData + totalFetch -1) / totalFetch;
+				
 				for (int a=0; a<totalLoop; a++) {
 					TransactionTemplate tt = new TransactionTemplate(targetTxManager);
-					totalUpdated = totalUpdated +tt.execute(s -> {
-						int total = 0;
+					List<HashMap<String, String>> listUpdates = tt.execute(s -> {
+						List<HashMap<String, String>> listUpdate = new ArrayList<>();
 						try {
-							total = execGenerateDoc01(totalFetch, whereCond);
+							listUpdate = execGenerateDoc01(totalFetch, whereCond);
 						} catch (Exception e) {
+						}
+						return listUpdate;
+					});
+					
+					TransactionTemplate ts = new TransactionTemplate(targetTxManager);
+					totalUpdated = totalUpdated + ts.execute(s -> {
+						int total = 0;
+						for (HashMap<String, String> mapUpdate : listUpdates) {
+							boolean isError = mapUpdate.get("is_error").equalsIgnoreCase("Y");
+							updateStatus01(target, mapUpdate.get("uu"), isError, mapUpdate.get("errormsg"));
+							if (!isError) {
+								total += 1;
+							}
 						}
 						return total;
 					});
 				}
 			}
+			
 			List<Map<String, Object>> listData = new ArrayList<Map<String,Object>>();
 			Map<String, Object> mapData = new LinkedHashMap<String, Object>();
 			mapData.put("total_updated", totalUpdated);
@@ -1703,11 +1718,12 @@ public class SISGlobalExecute {
 		return response;
 	}
 	
-	int execGenerateDoc01(
+	List<HashMap<String, String>> execGenerateDoc01(
 			int totalFetch,
 			String whereCond
 		) {
 		int totalUpdated = 0;
+		List<HashMap<String, String>> listUpdate = new ArrayList<>();
 		try {
 			sql =
 					"select "
@@ -1740,6 +1756,10 @@ public class SISGlobalExecute {
 			List<Map<String, Object>> resultList = target.queryForList(sql);
 			for (Map<String, Object> mapData: resultList) {
 				String uu = (String)mapData.get("sis_tempsync_01_uu");
+				HashMap<String, String> mapUpdate = new HashMap<>();
+				mapUpdate.put("uu", uu);
+				mapUpdate.put("is_error", "N");
+				mapUpdate.put("errormsg", "");
 				boolean isError = false;
 				String errorMsg = "";
 				try {
@@ -1751,14 +1771,17 @@ public class SISGlobalExecute {
 				} catch (Exception e) {
 					isError = true;
 					errorMsg = e.getMessage();
+					mapUpdate.put("is_error", "Y");
+					mapUpdate.put("errormsg", e.getMessage());
 				}
-				updateStatus01(target, uu, isError, errorMsg);
+				
+				listUpdate.add(mapUpdate);
 			}
 		} catch (Exception e) {
 			totalUpdated = 0;
 			throw new RuntimeException(e.getMessage());
 		}
-		return totalUpdated;
+		return listUpdate;
 	}
 	
 }
