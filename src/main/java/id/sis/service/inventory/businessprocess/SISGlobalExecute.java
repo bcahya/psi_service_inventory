@@ -1003,6 +1003,22 @@ public class SISGlobalExecute {
 					RB_MOBOM bom = bu.getBOM(rbReq.getList_bom(), rbRL.getBom_id());
 					if (bom.getBomtype().equalsIgnoreCase("SC")) {
 						for (RB_MOBOMLine bl: bom.getList_line()) {
+							List<RB_MORouting> listProductRouting = bu.getListProductRouting(rbReq.getList_routing(),
+									rbReq.getList_product(), bl.getProduct_id());
+							RB_MORouting rotingBuyRL = null;
+							for (RB_MORouting prt: listProductRouting) {
+								if (prt.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_BUY)) {
+									rotingBuyRL = prt;
+									break;
+								}
+							}
+							int locatorID = rbRL.getLocator_id();
+							int whID = rbRL.getWarehouse_id();
+							if (rotingBuyRL != null) {
+								locatorID = rotingBuyRL.getLocatorto_id();
+								whID = rotingBuyRL.getWarehouseto_id();
+							}
+							
 							BigDecimal qtyLine = qty.multiply(bl.getQty());
 							RB_MOProduct prd = bu.getProduct(rbReq.getList_product(), bl.getProduct_id());
 							boolean isReq = false;
@@ -1016,7 +1032,7 @@ public class SISGlobalExecute {
 							}
 							if (isReq) {
 								BigDecimal qtySOH = new BigDecimal(0);
-								RB_MOSOH soh = bu.getSOH(rbReq.getList_soh(), prd.getProduct_id(), rbRL.getLocator_id());
+								RB_MOSOH soh = bu.getSOH(rbReq.getList_soh(), prd.getProduct_id(), locatorID);
 								if (soh != null) {
 									qtySOH = soh.getQty();
 								}
@@ -1025,7 +1041,7 @@ public class SISGlobalExecute {
 									soh.setQty(qtyDiff);
 								}
 								if (qtyDiff.signum() < 0) {
-									generateReqSC(rbReq, bl.getProduct_id(), locSearchID, rbRL.getWarehouse_id(), qtyDiff.abs(), listReq);
+									generateReqSC(rbReq, bl.getProduct_id(), locSearchID, whID, qtyDiff.abs(), listReq);
 									if (soh != null) {
 										soh.setQty(new BigDecimal(0));
 									}
