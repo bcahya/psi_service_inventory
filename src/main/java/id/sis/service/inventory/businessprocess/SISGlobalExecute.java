@@ -670,6 +670,7 @@ public class SISGlobalExecute {
 		int seqMove = 100000;
 		int seqSC = 100000;
 		for (RB_MOBOMLine bomLine: bom.getList_line()) {
+			System.out.println("bom.getBom_id(): "+bom.getBom_id()+", bomLine.getProduct_id(): "+bomLine.getProduct_id()+", bomLine.getBom_ref_id(): "+bomLine.getBom_ref_id());
 			RB_MOProduct product = bu.getProduct(rbmo.getList_product(), bomLine.getProduct_id());
 			if (product == null) {
 				throw new Exception("Product id "+bomLine.getProduct_id()+" not in bom id "+bom.getBom_id());
@@ -772,7 +773,17 @@ public class SISGlobalExecute {
 						qtySOH = soh.getQty();
 					}
 					if (qtySOH.signum() < 0) {
-						bu.generateReq(mapReqs, listReq, rbmo.getList_product(), routing.getWarehouseto_id(), bomLine.getProduct_id(), qtySOH.abs());
+						int whID = 0;
+						for (RB_MOWH wh: rbmo.getList_wh()) {
+							if (wh.getLocator_stock_id() == locSearchID) {
+								whID = wh.getWarehouse_id();
+								break;
+							}
+						}
+						if (whID == 0) {
+							throw new Exception("Warehouse of locatorID "+locSearchID+" not found!");
+						}
+						bu.generateReq(mapReqs, listReq, rbmo.getList_product(), whID, bomLine.getProduct_id(), qtySOH.abs());
 						soh.setQty(new BigDecimal(0));
 					}
 					if (isSC) {

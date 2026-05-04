@@ -105,9 +105,12 @@ public class SIS_BisproUtils {
 			List<RB_MORouting> listRouting,
 			List<RB_MOProduct> listProduct,
 			int productID
-			){
+			) throws Exception{
 		List<RB_MORouting> listProductRouting = new ArrayList<RB_MORouting>();
 		RB_MOProduct product = getProduct(listProduct, productID);
+		if (product == null) {
+			throw new Exception("Please check routing product ID "+productID);
+		}
 		for(Integer rID: product.getList_routing()) {
 			RB_MORouting routing = getRouting(listRouting, rID);
 			if (routing != null) {
