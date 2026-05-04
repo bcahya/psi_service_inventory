@@ -1120,69 +1120,70 @@ public class SISGlobalExecute {
 				}
 				
 				
-				//generate Requisition Components
-				if (product.isIs_bom()) {
-					RB_MOBOM bom = bu.getBOM(rbReq.getList_bom(), rbRL.getBom_id());
-					if (bom.getBomtype().equalsIgnoreCase("SC")) {
-						for (RB_MOBOMLine bl: bom.getList_line()) {
-							BigDecimal qtyLine = qty.multiply(bl.getQty());
-							RB_MOProduct prd = bu.getProduct(rbReq.getList_product(), bl.getProduct_id());
-							boolean isReq = false;
-							if (!prd.isIs_bom()) {
-								isReq = true;
-							} else {
-								RB_MOBOM bomRef = bu.getBOM(rbReq.getList_bom(), bom.getBom_id(), prd.getProduct_id());
-								if (bomRef.getBomtype().equalsIgnoreCase("SC")) {
-									isReq = true;
-								}
-							}
-							if (isReq) {
-								BigDecimal qtySOH = new BigDecimal(0);
-								RB_MOSOH soh = bu.getSOH(rbReq.getList_soh(), prd.getProduct_id(), rbRL.getLocator_id());
-								if (soh != null) {
-									qtySOH = soh.getQty();
-								}
-								BigDecimal qtyDiff = qtySOH.subtract(qtyLine);
-								if (soh != null) {
-									soh.setQty(qtyDiff);
-								}
-								if (qtyDiff.signum() < 0) {
-									generateReqSC(rbReq, bl.getProduct_id(), locSearchID, rbRL.getWarehouse_id(), qtyDiff.abs(), listReq);
-									if (soh != null) {
-										soh.setQty(new BigDecimal(0));
-									}
-								}
-							} else {
-								LinkedHashMap<String, Object> mapPOP = new LinkedHashMap<String, Object>();
-								boolean isExistPOP = false;
-								for (LinkedHashMap<String, Object> mapP: listPOP) {
-									int productID = (int)mapP.get("product_id");
-									int bomID = (int)mapP.get("bom_id");
-									if (productID == prd.getProduct_id()
-											&& bomID == rbRL.getBom_id()) {
-										mapPOP = mapP;
-										isExistPOP = true;
-										break;
-									}
-								}
-								if (mapPOP.isEmpty()) {
-									RB_MOBOM b = bu.getBOM(rbReq.getList_bom(), rbRL.getBom_id(), prd.getProduct_id());
-									mapPOP.put("product_id", prd.getProduct_id());
-									mapPOP.put("bom_id", b.getBom_id());
-									mapPOP.put("qty", new BigDecimal(0));
-								}
-								mapPOP.put("qty", ((BigDecimal)mapPOP.get("qty")).add(qtyLine));
-								if (!isExistPOP) {
-									listPOP.add(mapPOP);
-								}
-							}
-						}
-					}
-				}
+//				//generate Requisition Components
+//				if (product.isIs_bom()) {
+//					RB_MOBOM bom = bu.getBOM(rbReq.getList_bom(), rbRL.getBom_id());
+//					if (bom.getBomtype().equalsIgnoreCase("SC")) {
+//						for (RB_MOBOMLine bl: bom.getList_line()) {
+//							BigDecimal qtyLine = qty.multiply(bl.getQty());
+//							RB_MOProduct prd = bu.getProduct(rbReq.getList_product(), bl.getProduct_id());
+//							boolean isReq = false;
+//							if (!prd.isIs_bom()) {
+//								isReq = true;
+//							} else {
+//								RB_MOBOM bomRef = bu.getBOM(rbReq.getList_bom(), bom.getBom_id(), prd.getProduct_id());
+//								if (bomRef.getBomtype().equalsIgnoreCase("SC")) {
+//									isReq = true;
+//								}
+//							}
+//							if (isReq) {
+//								BigDecimal qtySOH = new BigDecimal(0);
+//								RB_MOSOH soh = bu.getSOH(rbReq.getList_soh(), prd.getProduct_id(), rbRL.getLocator_id());
+//								if (soh != null) {
+//									qtySOH = soh.getQty();
+//								}
+//								BigDecimal qtyDiff = qtySOH.subtract(qtyLine);
+//								if (soh != null) {
+//									soh.setQty(qtyDiff);
+//								}
+//								if (qtyDiff.signum() < 0) {
+//									generateReqSC(rbReq, bl.getProduct_id(), locSearchID, rbRL.getWarehouse_id(), qtyDiff.abs(), listReq);
+//									if (soh != null) {
+//										soh.setQty(new BigDecimal(0));
+//									}
+//								}
+//							} else {
+//								LinkedHashMap<String, Object> mapPOP = new LinkedHashMap<String, Object>();
+//								boolean isExistPOP = false;
+//								for (LinkedHashMap<String, Object> mapP: listPOP) {
+//									int productID = (int)mapP.get("product_id");
+//									int bomID = (int)mapP.get("bom_id");
+//									if (productID == prd.getProduct_id()
+//											&& bomID == rbRL.getBom_id()) {
+//										mapPOP = mapP;
+//										isExistPOP = true;
+//										break;
+//									}
+//								}
+//								if (mapPOP.isEmpty()) {
+//									RB_MOBOM b = bu.getBOM(rbReq.getList_bom(), rbRL.getBom_id(), prd.getProduct_id());
+//									mapPOP.put("product_id", prd.getProduct_id());
+//									mapPOP.put("bom_id", b.getBom_id());
+//									mapPOP.put("qty", new BigDecimal(0));
+//								}
+//								mapPOP.put("qty", ((BigDecimal)mapPOP.get("qty")).add(qtyLine));
+//								if (!isExistPOP) {
+//									listPOP.add(mapPOP);
+//								}
+//							}
+//						}
+//					}
+//				}
 				
 				if (!isExistReq) {
 					resultList.add(mapResult);
 				}
+				
 			}
 			
 			for (Map<String, Object> mapResult: resultList) {
