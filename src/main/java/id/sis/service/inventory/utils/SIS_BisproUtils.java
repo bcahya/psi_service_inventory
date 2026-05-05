@@ -221,6 +221,13 @@ public class SIS_BisproUtils {
 				break;
 			}
 		}
+		if (soh == null) {
+			soh = new RB_MOSOH();
+			soh.setProduct_id(productID);
+			soh.setLocator_id(locatorID);
+			soh.setQty(new BigDecimal(0));
+			listSOH.add(soh);
+		}
 		return soh;
 	}
 	
