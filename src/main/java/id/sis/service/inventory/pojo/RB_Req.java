@@ -11,7 +11,14 @@ public class RB_Req {
 	List<RB_MOBOM> list_bom = new ArrayList<RB_MOBOM>();
 	List<RB_MOProduct> list_product = new ArrayList<RB_MOProduct>();
 	List<RB_MOProductReplenish> list_replenish = new ArrayList<RB_MOProductReplenish>();
+	List<RB_MOWH> list_wh = new ArrayList<RB_MOWH>();
 	
+	public List<RB_MOWH> getList_wh() {
+		return list_wh;
+	}
+	public void setList_wh(List<RB_MOWH> list_wh) {
+		this.list_wh = list_wh;
+	}
 	public List<RB_MOProduct> getList_product() {
 		return list_product;
 	}
