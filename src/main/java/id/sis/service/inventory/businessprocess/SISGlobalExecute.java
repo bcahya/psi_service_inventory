@@ -960,56 +960,52 @@ public class SISGlobalExecute {
 					int seqMove = 99900;
 					RB_MOBOM bom = bu.getBOM(rbReq.getList_bom(), rbRL.getBom_id());
 					RB_MOWH whl = bu.getWarehouse(rbReq.getList_wh(), bom.getWarehouse_id());
-					
-//					if (bom.getBomtype().equalsIgnoreCase("SC")) {
-						for (RB_MOBOMLine bl: bom.getList_line()) {
-							locSearchID = whl.getLocator_pre_id();
-							RB_MOProduct prd = bu.getProduct(rbReq.getList_product(), bl.getProduct_id());
-							BigDecimal qtyLine = qty.multiply(bl.getQty());
-							int routingLineID = 0;
-//							locSearchID = rbRL.getLocator_id();
-							int counter = 0;
-							boolean isFrom = false;
-							List<RB_MORouting> listProductRouting = bu.getListProductRouting(rbReq.getList_routing(),
-									rbReq.getList_product(), bl.getProduct_id());
+					if (!bom.getBomtype().equalsIgnoreCase("SC")) {
+						continue;
+					}
+					for (RB_MOBOMLine bl: bom.getList_line()) {
+						locSearchID = whl.getLocator_pre_id();
+						RB_MOProduct prd = bu.getProduct(rbReq.getList_product(), bl.getProduct_id());
+						BigDecimal qtyLine = qty.multiply(bl.getQty());
+						int routingLineID = 0;
+						int counter = 0;
+						boolean isFrom = false;
+						List<RB_MORouting> listProductRouting = bu.getListProductRouting(rbReq.getList_routing(),
+								rbReq.getList_product(), bl.getProduct_id());
+						
+						while(true) {
+							counter += 1;
+							if (counter > 15) {
+								throw new Exception("Routing never ending loop!");
+							}
 							
-//							RB_MOProduct productLine = bu.getProduct(rbReq.getList_product(), bl.getProduct_id());
-//							if (productLine.isIs_bom()) {
-//								RB_MOBOM bomRef = bu.getBOM(rbReq.getList_bom(), bom.getBom_id(), bl.getProduct_id());
-//								if (!bomRef.getBomtype().equalsIgnoreCase("SC")) {
-//									continue;
-//								}
-//							}
 							
-							while(true) {
-								counter += 1;
-								if (counter > 15) {
-									throw new Exception("Routing never ending loop!");
+							RB_MORouting routing = null;
+							routing = bu.getNextRouting(listProductRouting, locSearchID, isFrom);
+							if (routing == null) {
+								break;
+							}
+							if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)) {
+								locSearchID = routing.getLocatorto_id();
+								isFrom = true;
+							} else if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PULLFROM)) {
+								isFrom = false;
+								locSearchID = routing.getLocatorfrom_id();
+							}
+							if (routingLineID == routing.getRoutingline_id()) {
+								break;
+							}
+							routingLineID = routing.getRoutingline_id();
+							
+							boolean isMF = false;
+							if (prd.isIs_bom()) {
+								RB_MOBOM br = bu.getBOM(rbReq.getList_bom(), rbRL.getBom_id(), prd.getProduct_id());
+								if (br.getBomtype().equalsIgnoreCase("MF")) {
+									isMF = true;
 								}
+							}
 								
-								
-								RB_MORouting routing = null;
-								routing = bu.getNextRouting(listProductRouting, locSearchID, isFrom);
-								if (routing == null) {
-									break;
-								}
-								if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)) {
-									locSearchID = routing.getLocatorto_id();
-									isFrom = true;
-								} else if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PULLFROM)) {
-									isFrom = false;
-									locSearchID = routing.getLocatorfrom_id();
-								}
-								if (routingLineID == routing.getRoutingline_id()) {
-									break;
-								}
-								routingLineID = routing.getRoutingline_id();
-								
-//								if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)
-//										&& !bom.getBomtype().equalsIgnoreCase("SC")) {
-//									throw new Exception("Routing Line ID "+routing.getRoutingline_id()+" not allowed to set action PUSH TO!");
-//								}
-								
+							if (!isMF) {
 								if (routing.getOperation_type().equalsIgnoreCase(SISConstants.MO_ROUTING_OPERATION_TAKEFROMSTOCK)
 										|| routing.getOperation_type().equalsIgnoreCase(SISConstants.MO_ROUTING_OPERATION_TAKEFROMSTOCKTRIGGERANOTHERRULE)) {
 									BigDecimal qtySOH = new BigDecimal(0);
@@ -1052,133 +1048,40 @@ public class SISGlobalExecute {
 										bu.generateReq(mapReqs, listReq, rbReq.getList_product(), whID, bl.getProduct_id(), qtySOH.abs());
 										soh.setQty(new BigDecimal(0));
 									}
-//									if (isSC) {
-//										RB_MOWH wh = bu.getWarehouse(rbmo.getList_wh(), bom.getWarehouse_id());
-//										seqSC = generateMoveSC(listMove, rbmo.getList_wh(), wh, rbmo.getList_bom(), bom, product,
-//												listProductRouting, qtyLine, seqSC);
-//									}
 									break;
 								}
-								if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_MANUFACTURE)) {
-									LinkedHashMap<String, Object> mapPOP = new LinkedHashMap<String, Object>();
-									RB_MOBOM b = bu.getBOM(rbReq.getList_bom(), rbRL.getBom_id(), prd.getProduct_id());
-									if (!b.getBomtype().equalsIgnoreCase("SC")) {
-										boolean isExistPOP = false;
-										for (LinkedHashMap<String, Object> mapP: listPOP) {
-											int productID = (int)mapP.get("product_id");
-											int bomID = (int)mapP.get("bom_id");
-											if (productID == prd.getProduct_id()
-													&& bomID == rbRL.getBom_id()) {
-												mapPOP = mapP;
-												isExistPOP = true;
-												break;
-											}
-										}
-										if (mapPOP.isEmpty()) {
-											mapPOP.put("product_id", prd.getProduct_id());
-											mapPOP.put("bom_id", b.getBom_id());
-											mapPOP.put("qty", new BigDecimal(0));
-										}
-										mapPOP.put("qty", ((BigDecimal)mapPOP.get("qty")).add(qtyLine));
-										if (!isExistPOP) {
-											listPOP.add(mapPOP);
+							}
+							if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_MANUFACTURE)) {
+								LinkedHashMap<String, Object> mapPOP = new LinkedHashMap<String, Object>();
+								RB_MOBOM b = bu.getBOM(rbReq.getList_bom(), rbRL.getBom_id(), prd.getProduct_id());
+								if (!b.getBomtype().equalsIgnoreCase("SC")) {
+									boolean isExistPOP = false;
+									for (LinkedHashMap<String, Object> mapP: listPOP) {
+										int productID = (int)mapP.get("product_id");
+										int bomID = (int)mapP.get("bom_id");
+										if (productID == prd.getProduct_id()
+												&& bomID == rbRL.getBom_id()) {
+											mapPOP = mapP;
+											isExistPOP = true;
+											break;
 										}
 									}
+									if (mapPOP.isEmpty()) {
+										mapPOP.put("product_id", prd.getProduct_id());
+										mapPOP.put("bom_id", b.getBom_id());
+										mapPOP.put("qty", new BigDecimal(0));
+									}
+									mapPOP.put("qty", ((BigDecimal)mapPOP.get("qty")).add(qtyLine));
+									if (!isExistPOP) {
+										listPOP.add(mapPOP);
+									}
 								}
-								
-								
-								/////////////////////////////
-								
-//								RB_MORouting routing = bu.getNextRouting(listProductRouting, locSearchID, isFrom, "PT");
-//								if (routing == null) {
-//									break;
-//								}
-//								if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)
-//										|| routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_MANUFACTURE)) {
-//									isFrom = true;
-//									locSearchID = routing.getLocatorto_id();
-//								} else if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PULLFROM)) {
-//			//						isFrom = false;
-//			//						locSearchID = routing.getLocatorfrom_id();
-//									break;
-//								}
-//								if (routingLineID == routing.getRoutingline_id()) {
-//									break;
-//								}
-//								routingLineID = routing.getRoutingline_id();
-//								locSearchID = routing.getLocatorto_id();
-//								if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PUSHTO)
-//										|| routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_PULLFROM)) {
-//									seqMove = bu.generateMove(listMove, routing, productLine.getProduct_id(), qtyLine, true, seqMove);
-//								}
-								
 							}
+							
 						}
-						
-//					}
+					}
 					
 				}
-				
-				
-//				//generate Requisition Components
-//				if (product.isIs_bom()) {
-//					RB_MOBOM bom = bu.getBOM(rbReq.getList_bom(), rbRL.getBom_id());
-//					if (bom.getBomtype().equalsIgnoreCase("SC")) {
-//						for (RB_MOBOMLine bl: bom.getList_line()) {
-//							BigDecimal qtyLine = qty.multiply(bl.getQty());
-//							RB_MOProduct prd = bu.getProduct(rbReq.getList_product(), bl.getProduct_id());
-//							boolean isReq = false;
-//							if (!prd.isIs_bom()) {
-//								isReq = true;
-//							} else {
-//								RB_MOBOM bomRef = bu.getBOM(rbReq.getList_bom(), bom.getBom_id(), prd.getProduct_id());
-//								if (bomRef.getBomtype().equalsIgnoreCase("SC")) {
-//									isReq = true;
-//								}
-//							}
-//							if (isReq) {
-//								BigDecimal qtySOH = new BigDecimal(0);
-//								RB_MOSOH soh = bu.getSOH(rbReq.getList_soh(), prd.getProduct_id(), rbRL.getLocator_id());
-//								if (soh != null) {
-//									qtySOH = soh.getQty();
-//								}
-//								BigDecimal qtyDiff = qtySOH.subtract(qtyLine);
-//								if (soh != null) {
-//									soh.setQty(qtyDiff);
-//								}
-//								if (qtyDiff.signum() < 0) {
-//									generateReqSC(rbReq, bl.getProduct_id(), locSearchID, rbRL.getWarehouse_id(), qtyDiff.abs(), listReq);
-//									if (soh != null) {
-//										soh.setQty(new BigDecimal(0));
-//									}
-//								}
-//							} else {
-//								LinkedHashMap<String, Object> mapPOP = new LinkedHashMap<String, Object>();
-//								boolean isExistPOP = false;
-//								for (LinkedHashMap<String, Object> mapP: listPOP) {
-//									int productID = (int)mapP.get("product_id");
-//									int bomID = (int)mapP.get("bom_id");
-//									if (productID == prd.getProduct_id()
-//											&& bomID == rbRL.getBom_id()) {
-//										mapPOP = mapP;
-//										isExistPOP = true;
-//										break;
-//									}
-//								}
-//								if (mapPOP.isEmpty()) {
-//									RB_MOBOM b = bu.getBOM(rbReq.getList_bom(), rbRL.getBom_id(), prd.getProduct_id());
-//									mapPOP.put("product_id", prd.getProduct_id());
-//									mapPOP.put("bom_id", b.getBom_id());
-//									mapPOP.put("qty", new BigDecimal(0));
-//								}
-//								mapPOP.put("qty", ((BigDecimal)mapPOP.get("qty")).add(qtyLine));
-//								if (!isExistPOP) {
-//									listPOP.add(mapPOP);
-//								}
-//							}
-//						}
-//					}
-//				}
 				
 				if (!isExistReq) {
 					resultList.add(mapResult);
