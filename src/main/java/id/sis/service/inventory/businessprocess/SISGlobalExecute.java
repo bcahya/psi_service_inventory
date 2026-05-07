@@ -1009,7 +1009,7 @@ public class SISGlobalExecute {
 								if (routing.getOperation_type().equalsIgnoreCase(SISConstants.MO_ROUTING_OPERATION_TAKEFROMSTOCK)
 										|| routing.getOperation_type().equalsIgnoreCase(SISConstants.MO_ROUTING_OPERATION_TAKEFROMSTOCKTRIGGERANOTHERRULE)) {
 									BigDecimal qtySOH = new BigDecimal(0);
-									RB_MOSOH soh = bu.getSOH(rbReq.getList_soh(), product.getProduct_id(), locSearchID);
+									RB_MOSOH soh = bu.getSOH(rbReq.getList_soh(), prd.getProduct_id(), locSearchID);
 									if (soh != null) {
 										qtySOH = soh.getQty();
 									}
@@ -1030,7 +1030,7 @@ public class SISGlobalExecute {
 								}
 								if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_BUY)) {
 									BigDecimal qtySOH = new BigDecimal(0);
-									RB_MOSOH soh = bu.getSOH(rbReq.getList_soh(), product.getProduct_id(), locSearchID);
+									RB_MOSOH soh = bu.getSOH(rbReq.getList_soh(), prd.getProduct_id(), locSearchID);
 									if (soh != null) {
 										qtySOH = soh.getQty();
 									}
