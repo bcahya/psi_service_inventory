@@ -28,7 +28,7 @@ public class SISController {
 		SISResponse response = new SISResponse();
 		try {
 			response.setStatus("S");
-			response.setMessage("Test Sukses!");
+			response.setMessage("Test Sukses Versi 1.0.0");
 		} catch (Exception e) {
 			response.setStatus("E");
 			response.setMessage("Test Failed: " + e.getMessage());
