@@ -129,6 +129,7 @@ public class SISGlobalExecute {
 	
 	public SISResponse calculateInventoryCharge(RB_InventoryCharge param) throws Exception {
 		logger.info("[SIS] calculateInventoryCharge");
+		StringBuilder sbLog = new StringBuilder();
 		SISResponse response = new SISResponse();
 		try {
 			//sorting
@@ -137,7 +138,7 @@ public class SISGlobalExecute {
 			List<RB_InventoryChargeDetail> listSorted = new ArrayList<>();
 			for (RB_InventoryChargeDetail pd: param.getList_detail()) {
 				String key =
-						"1"+SISUtil.addZero(Integer.valueOf(pd.getType()), 5)
+						"1"+SISUtil.addZero(Integer.valueOf(pd.getType().equalsIgnoreCase("") ? "0" :pd.getType()), 5)
 						+ SISUtil.addZero(pd.getCategory_seqno(), 10)
 						+ SISUtil.addZero(pd.getSubcategory_seqno(), 10)
 						+ SISUtil.addZero(pd.getLine(), 10);
@@ -145,6 +146,7 @@ public class SISGlobalExecute {
 				listKey.add(key);
 			}			
 			Collections.sort(listKey, Collections.reverseOrder());
+			SISUtil.appendEnterSB(sbLog, "listKey: "+listKey.toString());
 			for (String key: listKey) {
 				listSorted.add(mapSort.get(key));
 			}
@@ -166,10 +168,13 @@ public class SISGlobalExecute {
 				List<Map<String, Object>> listSC = new ArrayList<>();
 				Map<String, Object> mapSC = new HashMap<String, Object>();
 				if (type.equalsIgnoreCase("1")) {
+					SISUtil.appendEnterSB(sbLog, "type "+type);
 					int countSC = 0;
 					List<RB_InventoryChargeDetail> listPD = mapType.get(type);
 					for (int a=0; a<listPD.size(); a++) {
 						RB_InventoryChargeDetail pd = listPD.get(a);
+						SISUtil.appendEnterSB(sbLog, "RB_InventoryChargeDetail: "+SISUtil.convertObjectToString(pd));
+						SISUtil.appendEnterSB(sbLog, "mapSC: "+mapSC.toString());
 						
 						if (subcategory_id != pd.getSubcategory_id()
 								|| a==listPD.size()-1) {
@@ -226,6 +231,11 @@ public class SISGlobalExecute {
 							}
 							listSC.clear();
 							qtySC = new BigDecimal(0);
+							
+							SISUtil.appendEnterSB(sbLog, "mapSC: "+mapSC.toString());
+							SISUtil.appendEnterSB(sbLog, "qtySC: "+qtySC.toString());
+							SISUtil.appendEnterSB(sbLog, "resultList: "+resultList.toString());
+							
 						}
 						if (category_id != pd.getCategory_id()) {
 							category_id = pd.getCategory_id();
@@ -242,6 +252,7 @@ public class SISGlobalExecute {
 							qtyCredit = qtySC;
 						}
 						
+						SISUtil.appendEnterSB(sbLog, "qtySC: "+SISUtil.getStringQty(qtySC));
 						mapSC = new HashMap<String, Object>();
 						mapSC.put("m_inventoryline_id", pd.getM_inventoryline_id());
 						mapSC.put("qty", qtySC);
@@ -249,9 +260,12 @@ public class SISGlobalExecute {
 						listSC.add(mapSC);
 					}
 				} else if (type.equalsIgnoreCase("2")) {
+					SISUtil.appendEnterSB(sbLog, "type: "+type);
 					List<RB_InventoryChargeDetail> listPD = mapType.get(type);
 					for (int a=0; a<listPD.size(); a++) {
 						RB_InventoryChargeDetail pd = listPD.get(a);
+						SISUtil.appendEnterSB(sbLog, "qtySC: "+SISUtil.getStringQty(qtySC));
+						SISUtil.appendEnterSB(sbLog, "RB_InventoryChargeDetail: "+SISUtil.convertObjectToString(pd));
 						mapSC = new HashMap<String, Object>();
 						if (category_id != pd.getCategory_id()
 								|| a==listPD.size()-1) {
@@ -265,8 +279,11 @@ public class SISGlobalExecute {
 								mapSC.put("price", pd.getPrice());
 								listSC.add(mapSC);
 							}
+							SISUtil.appendEnterSB(sbLog, "qtySC: "+SISUtil.getStringQty(qtySC));
+							SISUtil.appendEnterSB(sbLog, "listSC: "+listSC.toString());
 							
 							category_id = pd.getCategory_id();
+							SISUtil.appendEnterSB(sbLog, "category_id: "+category_id);
 							if (qtySC.signum() < 0) {
 								for (Map<String, Object> mapDetail: listSC) {
 									if (qtySC.signum() >= 0) {
@@ -290,6 +307,8 @@ public class SISGlobalExecute {
 									resultList.add(mapResult);
 								}
 							}
+							SISUtil.appendEnterSB(sbLog, "qtySC: "+SISUtil.getStringQty(qtySC));
+							SISUtil.appendEnterSB(sbLog, "resultList: "+resultList.toString());
 							
 							//last record
 							if (a==listPD.size()-1
@@ -315,6 +334,8 @@ public class SISGlobalExecute {
 								mapResult.put("amt", qtyDetail.abs().multiply(pd.getPrice()));
 								resultList.add(mapResult);
 							}
+							SISUtil.appendEnterSB(sbLog, "qtySC: "+SISUtil.getStringQty(qtySC));
+							SISUtil.appendEnterSB(sbLog, "resultList: "+resultList.toString());
 							
 							qtySC = new BigDecimal(0);
 						}
@@ -326,11 +347,13 @@ public class SISGlobalExecute {
 						listSC.add(mapSC);
 					}
 				} else if (type.equalsIgnoreCase("3")) {
+					SISUtil.appendEnterSB(sbLog, "type "+type);
 					List<RB_InventoryChargeDetail> listPD = mapType.get(type);
 					LinkedHashMap<String, HashMap<String, BigDecimal>> mapBK = new LinkedHashMap<>();
 					LinkedHashMap<String, HashMap<String, BigDecimal>> mapBJ = new LinkedHashMap<>();
 					LinkedHashMap<String, HashMap<String, BigDecimal>> mapRM = new LinkedHashMap<>();
 					for (RB_InventoryChargeDetail pd: listPD) {
+						SISUtil.appendEnterSB(sbLog, "RB_InventoryChargeDetail: "+SISUtil.convertObjectToString(pd));
 						String key = String.valueOf(pd.getCategory_id())+";"+String.valueOf(pd.getSis_bomcharge_id());
 						BigDecimal qty = pd.getQty();
 						BigDecimal price = pd.getPrice();
@@ -382,11 +405,16 @@ public class SISGlobalExecute {
 							mapRM.get(key).put("price", price);
 						}
 					}
+					SISUtil.appendEnterSB(sbLog, "mapBK: "+mapBK.toString());
+					SISUtil.appendEnterSB(sbLog, "mapBJ: "+mapBJ.toString());
+					SISUtil.appendEnterSB(sbLog, "mapRM: "+mapRM.toString());
 					
 					BigDecimal totalAmt = new BigDecimal(0);
 					LinkedHashMap<String, HashMap<String, BigDecimal>> mapBKTemp = new LinkedHashMap<>(mapBK);
 					LinkedHashMap<String, HashMap<String, BigDecimal>> mapBJTemp = new LinkedHashMap<>(mapBJ);
 					LinkedHashMap<String, HashMap<String, BigDecimal>> mapRMTemp = new LinkedHashMap<>(mapRM);
+					
+					SISUtil.appendEnterSB(sbLog, "totalAmt: "+SISUtil.getStringQty(totalAmt));
 					for (String key: mapBKTemp.keySet()) {
 						BigDecimal qty = mapBKTemp.get(key).get("qty");
 						if (qty.signum() > 0) {
@@ -396,6 +424,8 @@ public class SISGlobalExecute {
 							totalAmt = totalAmt.add(qty.multiply(mapBK.get(key).get("price")));
 						}
 					}
+					SISUtil.appendEnterSB(sbLog, "totalAmt: "+SISUtil.getStringQty(totalAmt));
+					
 					for (String key: mapBJTemp.keySet()) {
 						if (mapBJTemp.get(key).get("qty").signum() > 0) {
 							mapBJ.remove(key);
@@ -437,6 +467,8 @@ public class SISGlobalExecute {
 							}
 						}
 					}
+					SISUtil.appendEnterSB(sbLog, "mapBJ after kompensasi BK: "+mapBJ.toString());
+					
 					for (String key: mapRMTemp.keySet()) {
 						if (mapRMTemp.get(key).get("qty").signum() > 0) {
 							mapRM.remove(key);
@@ -447,6 +479,7 @@ public class SISGlobalExecute {
 						BigDecimal qty = mapBJ.get(key).get("qty").abs();
 						totalAmt = totalAmt.add(qty.multiply(mapBJ.get(key).get("price")));
 					}
+					SISUtil.appendEnterSB(sbLog, "totalAmt: "+SISUtil.getStringQty(totalAmt));
 					
 					BigDecimal qtyRM = new BigDecimal(0);
 					BigDecimal priceRM = new BigDecimal(0);
@@ -458,6 +491,9 @@ public class SISGlobalExecute {
 						productRM = mapRM.get(key).get("m_product_id").intValue();
 						qtyRM = qtyRM.add(mapRM.get(key).get("qty"));
 					}
+					SISUtil.appendEnterSB(sbLog, "qtyRM: "+SISUtil.getStringQty(qtyRM));
+					SISUtil.appendEnterSB(sbLog, "priceRM: "+SISUtil.getStringQty(priceRM));
+					
 					if (qtyRM.signum() < 0) {
 						for (String key: mapBK.keySet()) {
 							int bomID = Integer.valueOf(key.split(";")[1]);
@@ -472,6 +508,8 @@ public class SISGlobalExecute {
 							}
 						}
 					}
+					SISUtil.appendEnterSB(sbLog, "qtyRM kompensasi BK: "+SISUtil.getStringQty(qtyRM));
+					
 					if (qtyRM.signum() < 0) {
 						for (String key: mapBJ.keySet()) {
 							int bomID = Integer.valueOf(key.split(";")[1]);
@@ -486,9 +524,12 @@ public class SISGlobalExecute {
 							}
 						}
 					}
+					SISUtil.appendEnterSB(sbLog, "qtyRM kompensasi BJ: "+SISUtil.getStringQty(qtyRM));
+					
 					if (qtyRM.signum() < 0) {
 						totalAmt = totalAmt.add(qtyRM.abs().multiply(priceRM));
 					}
+					SISUtil.appendEnterSB(sbLog, "totalAmt: "+SISUtil.getStringQty(totalAmt));
 					
 					Map<String, Object> mapResult = new HashMap<String, Object>();
 					mapResult.put("m_inventory_id", param.getM_inventory_id());
@@ -496,9 +537,11 @@ public class SISGlobalExecute {
 					mapResult.put("amt", totalAmt);
 					resultList.add(mapResult);
 				} else if (type.equalsIgnoreCase("4")) {
+					SISUtil.appendEnterSB(sbLog, "type: "+type);
 					List<RB_InventoryChargeDetail> listPD = mapType.get(type);
 					for (int a=0; a<listPD.size(); a++) {
 						RB_InventoryChargeDetail pd = listPD.get(a);
+						SISUtil.appendEnterSB(sbLog, "RB_InventoryChargeDetail: "+SISUtil.convertObjectToString(pd));
 						if (pd.getQty().signum() < 0 && pd.isIs_dibebankan()) {
 							Map<String, Object> mapResult = new HashMap<String, Object>();
 							mapResult.put("m_inventory_id", param.getM_inventory_id());
@@ -507,7 +550,9 @@ public class SISGlobalExecute {
 							resultList.add(mapResult);
 						}
 					}
+					SISUtil.appendEnterSB(sbLog, "resultList: "+resultList.toString());
 				} else if (type.equalsIgnoreCase("5")) {
+					SISUtil.appendEnterSB(sbLog, "type: "+type);
 					List<RB_InventoryChargeDetail> listPD = mapType.get(type);
 					BigDecimal totalAmt = new BigDecimal(0);
 					BigDecimal amt = new BigDecimal(0);
@@ -517,6 +562,7 @@ public class SISGlobalExecute {
 					BigDecimal price_netto = new BigDecimal(0);
 					for (int a=0; a<listPD.size(); a++) {
 						RB_InventoryChargeDetail pd = listPD.get(a);
+						SISUtil.appendEnterSB(sbLog, "RB_InventoryChargeDetail: "+SISUtil.convertObjectToString(pd));
 						totalAmt = totalAmt.add(pd.getQty().multiply(pd.getPrice()));
 						percent = pd.getPercent();
 						
@@ -547,16 +593,29 @@ public class SISGlobalExecute {
 								price_netto = pd.getPrice_netto();
 							}
 						}
+						SISUtil.appendEnterSB(sbLog, "totalAmt: "+SISUtil.getStringQty(totalAmt));
+						SISUtil.appendEnterSB(sbLog, "amt: "+SISUtil.getStringQty(amt));
+						SISUtil.appendEnterSB(sbLog, "amt_netto: "+SISUtil.getStringQty(amt_netto));
+						SISUtil.appendEnterSB(sbLog, "percent: "+SISUtil.getStringQty(percent));
+						SISUtil.appendEnterSB(sbLog, "price: "+SISUtil.getStringQty(price));
+						SISUtil.appendEnterSB(sbLog, "price_netto: "+SISUtil.getStringQty(price_netto));
 					}
 					BigDecimal total = new BigDecimal(0);
 					if (totalAmt.signum() < 0) {
 						BigDecimal amtBruto = (totalAmt.abs().subtract(amt)).multiply(percent).divide(new BigDecimal(100), RoundingMode.HALF_UP);
+						SISUtil.appendEnterSB(sbLog, "amtBruto: "+SISUtil.getStringQty(amtBruto));
 						total = amtBruto.add(amt_netto);
 					}
+					SISUtil.appendEnterSB(sbLog, "total: "+SISUtil.getStringQty(total));
 					Map<String, Object> mapResult = new HashMap<String, Object>();
 					mapResult.put("m_inventoryline_id", 0);
 					mapResult.put("amt", total);
 					resultList.add(mapResult);
+				}
+			}
+			if (sbLog.length() > 0) {
+				for (Map<String, Object> mapResult: resultList) {
+					mapResult.put("log", sbLog.toString());
 				}
 			}
 			response = SISResponse.successResponse(resultList);
