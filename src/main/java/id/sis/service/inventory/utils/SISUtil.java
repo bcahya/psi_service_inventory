@@ -9,6 +9,8 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.sql.Timestamp;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -29,6 +31,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.DefaultTransactionDefinition;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import id.sis.service.inventory.properties.SISIdProperties;
 
@@ -496,5 +501,49 @@ public class SISUtil {
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         byte[] hash = digest.digest(input.getBytes());
         return java.util.HexFormat.of().formatHex(hash);
+    }
+	
+	public static void appendEnterSB(StringBuilder sb, String text) {
+		sb.append(text).append(System.lineSeparator());
+	}
+	
+	public static String convertObjectToString(Object o) {
+		ObjectMapper mapper = new ObjectMapper();
+		String result = "";
+		try {
+			result = mapper.writeValueAsString(o);
+		} catch (JsonProcessingException e) {
+			e.printStackTrace();
+		}
+		return result;
+	}
+	
+	public static String getStringQty(BigDecimal qty) {
+    	DecimalFormatSymbols symbols = new DecimalFormatSymbols();
+    	symbols.setGroupingSeparator(',');
+    	symbols.setDecimalSeparator('.');
+
+    	DecimalFormat df = new DecimalFormat("#,##0.#####", symbols);
+
+    	String result = df.format(qty);
+    	return result;
+    }
+	
+	public static String formatRupiah(BigDecimal amt) {
+		DecimalFormat kursIndonesia = (DecimalFormat) DecimalFormat.getCurrencyInstance();
+		DecimalFormatSymbols formatRp = new DecimalFormatSymbols();
+		formatRp.setCurrencySymbol("Rp. ");
+		formatRp.setMonetaryDecimalSeparator(',');
+		formatRp.setGroupingSeparator('.');
+		kursIndonesia.setDecimalFormatSymbols(formatRp);
+		return kursIndonesia.format(amt);
+	}
+	
+	public static int getIntObject(Object o) {
+    	int result = 0;
+    	if (!cekIsNull(o)) {
+    		result = (int)o;
+    	}
+    	return result;
     }
 }
