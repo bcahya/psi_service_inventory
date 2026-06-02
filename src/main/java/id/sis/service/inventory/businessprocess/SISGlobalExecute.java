@@ -554,62 +554,58 @@ public class SISGlobalExecute {
 				} else if (type.equalsIgnoreCase("5")) {
 					SISUtil.appendEnterSB(sbLog, "type: "+type);
 					List<RB_InventoryChargeDetail> listPD = mapType.get(type);
-					BigDecimal totalAmt = new BigDecimal(0);
-					BigDecimal amt = new BigDecimal(0);
-					BigDecimal amt_netto = new BigDecimal(0);
-					BigDecimal percent = new BigDecimal(0);
-					BigDecimal price = new BigDecimal(0);
-					BigDecimal price_netto = new BigDecimal(0);
+					HashMap<Integer, BigDecimal> mapCategoryQty = new HashMap<>();
 					for (int a=0; a<listPD.size(); a++) {
 						RB_InventoryChargeDetail pd = listPD.get(a);
-						SISUtil.appendEnterSB(sbLog, "RB_InventoryChargeDetail: "+SISUtil.convertObjectToString(pd));
-						totalAmt = totalAmt.add(pd.getQty().multiply(pd.getPrice()));
-						percent = pd.getPercent();
-						
-						if (category_id != pd.getCategory_id()
-								|| a==listPD.size()-1) {
-							category_id = pd.getCategory_id();
-							
-							//last record
-							if (a==listPD.size()-1) {
-								qtySC = qtySC.add(pd.getQty());
-							}
-							
-							if (qtySC.signum() < 0) {
-								amt = amt.add(qtySC.abs().multiply(price));
-								amt_netto = amt_netto.add(qtySC.abs().multiply(price_netto));
-							}
-							
-							qtySC = new BigDecimal(0);
-							price = new BigDecimal(0);
-							price_netto = new BigDecimal(0);
+						if (!mapCategoryQty.containsKey(pd.getCategory_id())) {
+							mapCategoryQty.put(pd.getCategory_id(), BigDecimal.ZERO);
 						}
-						qtySC = qtySC.add(pd.getQty());
-						if (pd.getQty().signum() < 0) {
-							if (price.compareTo(pd.getPrice()) < 0) {
-								price = pd.getPrice();
-							}
-							if (price_netto.compareTo(pd.getPrice_netto()) < 0) {
-								price_netto = pd.getPrice_netto();
-							}
+						mapCategoryQty.put(pd.getCategory_id(), mapCategoryQty.get(pd.getCategory_id()).add(pd.getQty()));
+					}
+					HashMap<Integer, BigDecimal> mapCategoryQtyTemp = new HashMap<>(mapCategoryQty);
+					for (Integer key: mapCategoryQtyTemp.keySet()) {
+						if (mapCategoryQtyTemp.get(key).signum() >= 0) {
+							mapCategoryQty.remove(key);
 						}
+					}
+					SISUtil.appendEnterSB(sbLog, "mapCategoryQty: "+mapCategoryQty.toString());
+					BigDecimal totalAmt = BigDecimal.ZERO;
+					BigDecimal maxBruto = BigDecimal.ZERO;
+					BigDecimal maxNetto = BigDecimal.ZERO;
+					BigDecimal percent = BigDecimal.ZERO;
+					for (int a=0; a<listPD.size(); a++) {
+						RB_InventoryChargeDetail pd = listPD.get(a);
+						BigDecimal bruto = pd.getQty().multiply(pd.getPrice());
+						BigDecimal netto = pd.getQty().multiply(pd.getPrice_netto());
+						SISUtil.appendEnterSB(sbLog, "bruto: "+SISUtil.getStringQty(bruto));
+						SISUtil.appendEnterSB(sbLog, "netto: "+SISUtil.getStringQty(netto));
+						if (mapCategoryQty.containsKey(pd.getCategory_id())
+								&& pd.getQty().signum() < 0) {
+							if (bruto.abs().compareTo(maxBruto) > 0) {
+								maxBruto = bruto.abs();
+							}
+							if (netto.abs().compareTo(maxNetto) > 0) {
+								maxNetto = netto.abs();
+							}
+							percent = pd.getPercent();
+						}
+						totalAmt = totalAmt.add(bruto);
 						SISUtil.appendEnterSB(sbLog, "totalAmt: "+SISUtil.getStringQty(totalAmt));
-						SISUtil.appendEnterSB(sbLog, "amt: "+SISUtil.getStringQty(amt));
-						SISUtil.appendEnterSB(sbLog, "amt_netto: "+SISUtil.getStringQty(amt_netto));
-						SISUtil.appendEnterSB(sbLog, "percent: "+SISUtil.getStringQty(percent));
-						SISUtil.appendEnterSB(sbLog, "price: "+SISUtil.getStringQty(price));
-						SISUtil.appendEnterSB(sbLog, "price_netto: "+SISUtil.getStringQty(price_netto));
 					}
-					BigDecimal total = new BigDecimal(0);
-					if (totalAmt.signum() < 0) {
-						BigDecimal amtBruto = (totalAmt.abs().subtract(amt)).multiply(percent).divide(new BigDecimal(100), RoundingMode.HALF_UP);
-						SISUtil.appendEnterSB(sbLog, "amtBruto: "+SISUtil.getStringQty(amtBruto));
-						total = amtBruto.add(amt_netto);
-					}
-					SISUtil.appendEnterSB(sbLog, "total: "+SISUtil.getStringQty(total));
+					
+					totalAmt = totalAmt.abs();
+					SISUtil.appendEnterSB(sbLog, "totalAmt: "+SISUtil.getStringQty(totalAmt));
+					SISUtil.appendEnterSB(sbLog, "maxBruto: "+SISUtil.getStringQty(maxBruto));
+					SISUtil.appendEnterSB(sbLog, "maxNetto: "+SISUtil.getStringQty(maxNetto));
+					
+					BigDecimal chargeAmt = (totalAmt.subtract(maxBruto)).multiply(percent).divide(new BigDecimal(100), 2, RoundingMode.HALF_UP);
+					SISUtil.appendEnterSB(sbLog, "totalAmt - maxBruto: "+SISUtil.getStringQty(chargeAmt));
+					chargeAmt = chargeAmt.add(maxNetto);
+					SISUtil.appendEnterSB(sbLog, "+ maxNetto: "+SISUtil.getStringQty(chargeAmt));
+					
 					Map<String, Object> mapResult = new HashMap<String, Object>();
 					mapResult.put("m_inventoryline_id", 0);
-					mapResult.put("amt", total);
+					mapResult.put("amt", chargeAmt);
 					resultList.add(mapResult);
 				}
 			}
