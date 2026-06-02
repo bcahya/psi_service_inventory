@@ -592,17 +592,18 @@ public class SISGlobalExecute {
 						totalAmt = totalAmt.add(bruto);
 						SISUtil.appendEnterSB(sbLog, "totalAmt: "+SISUtil.getStringQty(totalAmt));
 					}
-					
-					totalAmt = totalAmt.abs();
-					SISUtil.appendEnterSB(sbLog, "totalAmt: "+SISUtil.getStringQty(totalAmt));
-					SISUtil.appendEnterSB(sbLog, "maxBruto: "+SISUtil.getStringQty(maxBruto));
-					SISUtil.appendEnterSB(sbLog, "maxNetto: "+SISUtil.getStringQty(maxNetto));
-					
-					BigDecimal chargeAmt = (totalAmt.subtract(maxBruto)).multiply(percent).divide(new BigDecimal(100), 2, RoundingMode.HALF_UP);
-					SISUtil.appendEnterSB(sbLog, "totalAmt - maxBruto: "+SISUtil.getStringQty(chargeAmt));
-					chargeAmt = chargeAmt.add(maxNetto);
-					SISUtil.appendEnterSB(sbLog, "+ maxNetto: "+SISUtil.getStringQty(chargeAmt));
-					
+					BigDecimal chargeAmt = BigDecimal.ZERO;
+					if (totalAmt.signum() < 0) {
+						totalAmt = totalAmt.abs();
+						SISUtil.appendEnterSB(sbLog, "totalAmt: "+SISUtil.getStringQty(totalAmt));
+						SISUtil.appendEnterSB(sbLog, "maxBruto: "+SISUtil.getStringQty(maxBruto));
+						SISUtil.appendEnterSB(sbLog, "maxNetto: "+SISUtil.getStringQty(maxNetto));
+						
+						chargeAmt = (totalAmt.subtract(maxBruto)).multiply(percent).divide(new BigDecimal(100), 2, RoundingMode.HALF_UP);
+						SISUtil.appendEnterSB(sbLog, "totalAmt - maxBruto: "+SISUtil.getStringQty(chargeAmt));
+						chargeAmt = chargeAmt.add(maxNetto);
+						SISUtil.appendEnterSB(sbLog, "+ maxNetto: "+SISUtil.getStringQty(chargeAmt));
+					}
 					Map<String, Object> mapResult = new HashMap<String, Object>();
 					mapResult.put("m_inventoryline_id", 0);
 					mapResult.put("amt", chargeAmt);
