@@ -8,6 +8,7 @@ import java.math.RoundingMode;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -16,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -27,7 +29,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import id.sis.service.inventory.pojo.RB_InventoryCharge;
@@ -553,57 +554,115 @@ public class SISGlobalExecute {
 					SISUtil.appendEnterSB(sbLog, "resultList: "+resultList.toString());
 				} else if (type.equalsIgnoreCase("5")) {
 					SISUtil.appendEnterSB(sbLog, "type: "+type);
+					BigDecimal totalQty = BigDecimal.ZERO;
+					BigDecimal totalAmt = BigDecimal.ZERO;
+					BigDecimal chargeAmt = BigDecimal.ZERO;
 					List<RB_InventoryChargeDetail> listPD = mapType.get(type);
-					HashMap<Integer, BigDecimal> mapCategoryQty = new HashMap<>();
+					LinkedHashMap<Integer, BigDecimal> mapCategoryQty = new LinkedHashMap<>();
+					LinkedHashMap<Integer, LinkedHashMap<String, BigDecimal>> mapData = new LinkedHashMap<>();
 					for (int a=0; a<listPD.size(); a++) {
 						RB_InventoryChargeDetail pd = listPD.get(a);
+						totalQty = totalQty.add(pd.getQty());
+						totalAmt = totalAmt.add(pd.getQty().multiply(pd.getPrice()));
 						if (!mapCategoryQty.containsKey(pd.getCategory_id())) {
 							mapCategoryQty.put(pd.getCategory_id(), BigDecimal.ZERO);
 						}
 						mapCategoryQty.put(pd.getCategory_id(), mapCategoryQty.get(pd.getCategory_id()).add(pd.getQty()));
+						LinkedHashMap<String, BigDecimal> mapAmt = new LinkedHashMap<>();
+						mapAmt.put("qty", pd.getQty());
+						mapAmt.put("bruto", pd.getPrice());
+						mapAmt.put("netto", pd.getPrice_netto());
+						mapAmt.put("total_bruto", pd.getQty().multiply(pd.getPrice()));
+						mapAmt.put("total_netto", pd.getQty().multiply(pd.getPrice_netto()));
+						mapData.put(pd.getM_inventoryline_id(), mapAmt);
 					}
-					HashMap<Integer, BigDecimal> mapCategoryQtyTemp = new HashMap<>(mapCategoryQty);
-					for (Integer key: mapCategoryQtyTemp.keySet()) {
-						if (mapCategoryQtyTemp.get(key).signum() >= 0) {
-							mapCategoryQty.remove(key);
-						}
-					}
-					SISUtil.appendEnterSB(sbLog, "mapCategoryQty: "+mapCategoryQty.toString());
-					BigDecimal totalAmt = BigDecimal.ZERO;
-					BigDecimal maxBruto = BigDecimal.ZERO;
-					BigDecimal maxNetto = BigDecimal.ZERO;
-					BigDecimal percent = BigDecimal.ZERO;
-					for (int a=0; a<listPD.size(); a++) {
-						RB_InventoryChargeDetail pd = listPD.get(a);
-						BigDecimal bruto = pd.getQty().multiply(pd.getPrice());
-						BigDecimal netto = pd.getQty().multiply(pd.getPrice_netto());
-						SISUtil.appendEnterSB(sbLog, "bruto: "+SISUtil.getStringQty(bruto));
-						SISUtil.appendEnterSB(sbLog, "netto: "+SISUtil.getStringQty(netto));
-						if (mapCategoryQty.containsKey(pd.getCategory_id())
-								&& pd.getQty().signum() < 0) {
-							if (bruto.abs().compareTo(maxBruto) > 0) {
-								maxBruto = bruto.abs();
+					SISUtil.appendEnterSB(sbLog, "totalQty: "+SISUtil.getStringQty(totalQty));
+					SISUtil.appendEnterSB(sbLog, "totalAmt: "+SISUtil.getStringQty(totalAmt));
+					
+					if (totalQty.signum() < 0) {
+						LinkedHashMap<Integer, BigDecimal> mapCategoryMaxNetto = new LinkedHashMap<>();
+						HashMap<Integer, BigDecimal> mapCategoryQtyMinus = new HashMap<>();
+						for (Integer key: mapCategoryQty.keySet()) {
+							if (mapCategoryQty.get(key).signum() < 0) {
+								mapCategoryQtyMinus.put(key, mapCategoryQty.get(key));
 							}
-							if (netto.abs().compareTo(maxNetto) > 0) {
-								maxNetto = netto.abs();
-							}
-							percent = pd.getPercent();
 						}
-						totalAmt = totalAmt.add(bruto);
-						SISUtil.appendEnterSB(sbLog, "totalAmt: "+SISUtil.getStringQty(totalAmt));
-					}
-					BigDecimal chargeAmt = BigDecimal.ZERO;
-					if (totalAmt.signum() < 0) {
-						totalAmt = totalAmt.abs();
-						SISUtil.appendEnterSB(sbLog, "totalAmt: "+SISUtil.getStringQty(totalAmt));
-						SISUtil.appendEnterSB(sbLog, "maxBruto: "+SISUtil.getStringQty(maxBruto));
-						SISUtil.appendEnterSB(sbLog, "maxNetto: "+SISUtil.getStringQty(maxNetto));
+						for (int a=0; a<listPD.size(); a++) {
+							RB_InventoryChargeDetail pd = listPD.get(a);
+							int key = pd.getCategory_id();
+							if (!mapCategoryQtyMinus.containsKey(key)) {
+								continue;
+							}
+							if (!mapCategoryMaxNetto.containsKey(key)) {
+								mapCategoryMaxNetto.put(key, pd.getPrice_netto());
+							} else {
+								if (mapCategoryMaxNetto.get(key).compareTo(pd.getPrice_netto()) > 0) {
+									mapCategoryMaxNetto.put(key, pd.getPrice_netto());
+								}
+							}
+						}
+						SISUtil.appendEnterSB(sbLog, "mapCategoryMaxNetto: "+mapCategoryMaxNetto.toString());
+						SISUtil.appendEnterSB(sbLog, "mapCategoryQtyMinus: "+mapCategoryQtyMinus.toString());
 						
-						chargeAmt = (totalAmt.subtract(maxBruto)).multiply(percent).divide(new BigDecimal(100), 2, RoundingMode.HALF_UP);
-						SISUtil.appendEnterSB(sbLog, "totalAmt - maxBruto: "+SISUtil.getStringQty(chargeAmt));
-						chargeAmt = chargeAmt.add(maxNetto);
-						SISUtil.appendEnterSB(sbLog, "+ maxNetto: "+SISUtil.getStringQty(chargeAmt));
+						//sorting
+						LinkedHashMap<Integer, LinkedHashMap<String, BigDecimal>> mapDataSorted =
+							    mapData.entrySet()
+							        .stream()
+							        .sorted(Comparator.comparing(
+							            (Map.Entry<Integer, LinkedHashMap<String, BigDecimal>> e) ->
+							                e.getValue().getOrDefault("total_bruto", BigDecimal.ZERO)
+							        )
+//					        		.reversed()
+					        		)
+							        .collect(Collectors.toMap(
+							            Map.Entry::getKey,
+							            Map.Entry::getValue,
+							            (v1, v2) -> v1,
+							            LinkedHashMap::new
+							        ));
+						SISUtil.appendEnterSB(sbLog, "mapDataSorted: "+mapDataSorted.toString());
+						
+						BigDecimal sumQty = BigDecimal.ZERO;
+						BigDecimal totalSelisih = BigDecimal.ZERO;
+						for (Integer key: mapDataSorted.keySet()) {
+							LinkedHashMap<String, BigDecimal> mapAmt = mapDataSorted.get(key);
+							BigDecimal qty = mapAmt.get("qty");
+							if (qty.signum() >= 0) {
+								continue;
+							}
+							sumQty = sumQty.add(qty);
+							if (sumQty.compareTo(totalQty) < 0) {
+								break;
+							}
+							totalSelisih = totalSelisih.add(mapAmt.get("total_bruto"));
+						}
+						SISUtil.appendEnterSB(sbLog, "sumQty: "+SISUtil.getStringQty(sumQty));
+						SISUtil.appendEnterSB(sbLog, "totalSelisih: "+SISUtil.getStringQty(totalSelisih));
+						
+						chargeAmt = totalAmt.subtract(totalSelisih);
+						SISUtil.appendEnterSB(sbLog, "totalAmt - totalSelisih: "+SISUtil.getStringQty(chargeAmt));
+						chargeAmt = chargeAmt.multiply(new BigDecimal("0.5"));
+						SISUtil.appendEnterSB(sbLog, "*50%: "+SISUtil.getStringQty(chargeAmt));
+						
+						if (chargeAmt.signum() > 0) {
+							chargeAmt = BigDecimal.ZERO;
+						} else {
+							BigDecimal totalNettoCategory = BigDecimal.ZERO;
+							for (int key: mapCategoryQtyMinus.keySet()) {
+								BigDecimal qtyCategory = mapCategoryQtyMinus.get(key);
+								BigDecimal maxNettoCategory = mapCategoryMaxNetto.get(key);
+								BigDecimal amtNettoCategory = qtyCategory.multiply(maxNettoCategory);
+								totalNettoCategory = totalNettoCategory.add(amtNettoCategory);
+								SISUtil.appendEnterSB(sbLog, "qtyCategory: "+SISUtil.getStringQty(qtyCategory));
+								SISUtil.appendEnterSB(sbLog, "maxNettoCategory: "+SISUtil.getStringQty(maxNettoCategory));
+								SISUtil.appendEnterSB(sbLog, "amtNettoCategory: "+SISUtil.getStringQty(amtNettoCategory));
+							}
+							SISUtil.appendEnterSB(sbLog, "totalNettoCategory: "+SISUtil.getStringQty(totalNettoCategory));
+							chargeAmt = chargeAmt.add(totalNettoCategory);
+						}
 					}
+					SISUtil.appendEnterSB(sbLog, "chargeAmt: "+SISUtil.getStringQty(chargeAmt));
+					
 					Map<String, Object> mapResult = new HashMap<String, Object>();
 					mapResult.put("m_inventoryline_id", 0);
 					mapResult.put("amt", chargeAmt);
