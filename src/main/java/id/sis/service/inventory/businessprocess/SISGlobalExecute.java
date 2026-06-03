@@ -661,6 +661,7 @@ public class SISGlobalExecute {
 							chargeAmt = chargeAmt.add(totalNettoCategory);
 						}
 					}
+					chargeAmt = chargeAmt.abs();
 					SISUtil.appendEnterSB(sbLog, "chargeAmt: "+SISUtil.getStringQty(chargeAmt));
 					
 					Map<String, Object> mapResult = new HashMap<String, Object>();
