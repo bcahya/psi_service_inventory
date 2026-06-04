@@ -596,7 +596,7 @@ public class SISGlobalExecute {
 							if (!mapCategoryMaxNetto.containsKey(key)) {
 								mapCategoryMaxNetto.put(key, pd.getPrice_netto());
 							} else {
-								if (mapCategoryMaxNetto.get(key).compareTo(pd.getPrice_netto()) > 0) {
+								if (mapCategoryMaxNetto.get(key).compareTo(pd.getPrice_netto()) < 0) {
 									mapCategoryMaxNetto.put(key, pd.getPrice_netto());
 								}
 							}
