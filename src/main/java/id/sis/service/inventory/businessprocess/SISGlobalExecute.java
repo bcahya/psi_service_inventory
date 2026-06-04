@@ -558,16 +558,11 @@ public class SISGlobalExecute {
 					BigDecimal totalAmt = BigDecimal.ZERO;
 					BigDecimal chargeAmt = BigDecimal.ZERO;
 					List<RB_InventoryChargeDetail> listPD = mapType.get(type);
-					LinkedHashMap<Integer, BigDecimal> mapCategoryQty = new LinkedHashMap<>();
 					LinkedHashMap<Integer, LinkedHashMap<String, BigDecimal>> mapData = new LinkedHashMap<>();
 					for (int a=0; a<listPD.size(); a++) {
 						RB_InventoryChargeDetail pd = listPD.get(a);
 						totalQty = totalQty.add(pd.getQty());
 						totalAmt = totalAmt.add(pd.getQty().multiply(pd.getPrice()));
-						if (!mapCategoryQty.containsKey(pd.getCategory_id())) {
-							mapCategoryQty.put(pd.getCategory_id(), BigDecimal.ZERO);
-						}
-						mapCategoryQty.put(pd.getCategory_id(), mapCategoryQty.get(pd.getCategory_id()).add(pd.getQty()));
 						LinkedHashMap<String, BigDecimal> mapAmt = new LinkedHashMap<>();
 						mapAmt.put("qty", pd.getQty());
 						mapAmt.put("bruto", pd.getPrice());
@@ -580,65 +575,7 @@ public class SISGlobalExecute {
 					SISUtil.appendEnterSB(sbLog, "totalAmt: "+SISUtil.getStringQty(totalAmt));
 					
 					if (totalQty.signum() < 0) {
-						LinkedHashMap<Integer, BigDecimal> mapCategoryMaxNetto = new LinkedHashMap<>();
-						HashMap<Integer, BigDecimal> mapCategoryQtyMinus = new HashMap<>();
-						for (Integer key: mapCategoryQty.keySet()) {
-							if (mapCategoryQty.get(key).signum() < 0) {
-								mapCategoryQtyMinus.put(key, mapCategoryQty.get(key));
-							}
-						}
-						for (int a=0; a<listPD.size(); a++) {
-							RB_InventoryChargeDetail pd = listPD.get(a);
-							int key = pd.getCategory_id();
-							if (!mapCategoryQtyMinus.containsKey(key)) {
-								continue;
-							}
-							if (!mapCategoryMaxNetto.containsKey(key)) {
-								mapCategoryMaxNetto.put(key, pd.getPrice_netto());
-							} else {
-								if (mapCategoryMaxNetto.get(key).compareTo(pd.getPrice_netto()) < 0) {
-									mapCategoryMaxNetto.put(key, pd.getPrice_netto());
-								}
-							}
-						}
-						SISUtil.appendEnterSB(sbLog, "mapCategoryMaxNetto: "+mapCategoryMaxNetto.toString());
-						SISUtil.appendEnterSB(sbLog, "mapCategoryQtyMinus: "+mapCategoryQtyMinus.toString());
-						
-						//sorting
-						LinkedHashMap<Integer, LinkedHashMap<String, BigDecimal>> mapDataSorted =
-							    mapData.entrySet()
-							        .stream()
-							        .sorted(Comparator.comparing(
-							            (Map.Entry<Integer, LinkedHashMap<String, BigDecimal>> e) ->
-							                e.getValue().getOrDefault("total_bruto", BigDecimal.ZERO)
-							        )
-//					        		.reversed()
-					        		)
-							        .collect(Collectors.toMap(
-							            Map.Entry::getKey,
-							            Map.Entry::getValue,
-							            (v1, v2) -> v1,
-							            LinkedHashMap::new
-							        ));
-						SISUtil.appendEnterSB(sbLog, "mapDataSorted: "+mapDataSorted.toString());
-						
-						BigDecimal sumQty = BigDecimal.ZERO;
-						BigDecimal totalSelisih = BigDecimal.ZERO;
-						for (Integer key: mapDataSorted.keySet()) {
-							LinkedHashMap<String, BigDecimal> mapAmt = mapDataSorted.get(key);
-							BigDecimal qty = mapAmt.get("qty");
-							if (qty.signum() >= 0) {
-								continue;
-							}
-							sumQty = sumQty.add(qty);
-							if (sumQty.compareTo(totalQty) < 0) {
-								break;
-							}
-							totalSelisih = totalSelisih.add(mapAmt.get("total_bruto"));
-						}
-						SISUtil.appendEnterSB(sbLog, "sumQty: "+SISUtil.getStringQty(sumQty));
-						SISUtil.appendEnterSB(sbLog, "totalSelisih: "+SISUtil.getStringQty(totalSelisih));
-						
+						BigDecimal totalSelisih = getTotalSortedType5(mapData, "total_bruto", sbLog, totalQty);
 						chargeAmt = totalAmt.subtract(totalSelisih);
 						SISUtil.appendEnterSB(sbLog, "totalAmt - totalSelisih: "+SISUtil.getStringQty(chargeAmt));
 						chargeAmt = chargeAmt.multiply(new BigDecimal("0.5"));
@@ -647,18 +584,8 @@ public class SISGlobalExecute {
 						if (chargeAmt.signum() > 0) {
 							chargeAmt = BigDecimal.ZERO;
 						} else {
-							BigDecimal totalNettoCategory = BigDecimal.ZERO;
-							for (int key: mapCategoryQtyMinus.keySet()) {
-								BigDecimal qtyCategory = mapCategoryQtyMinus.get(key);
-								BigDecimal maxNettoCategory = mapCategoryMaxNetto.get(key);
-								BigDecimal amtNettoCategory = qtyCategory.multiply(maxNettoCategory);
-								totalNettoCategory = totalNettoCategory.add(amtNettoCategory);
-								SISUtil.appendEnterSB(sbLog, "qtyCategory: "+SISUtil.getStringQty(qtyCategory));
-								SISUtil.appendEnterSB(sbLog, "maxNettoCategory: "+SISUtil.getStringQty(maxNettoCategory));
-								SISUtil.appendEnterSB(sbLog, "amtNettoCategory: "+SISUtil.getStringQty(amtNettoCategory));
-							}
-							SISUtil.appendEnterSB(sbLog, "totalNettoCategory: "+SISUtil.getStringQty(totalNettoCategory));
-							chargeAmt = chargeAmt.add(totalNettoCategory);
+							totalSelisih = getTotalSortedType5(mapData, "total_netto", sbLog, totalQty);
+							chargeAmt = chargeAmt.add(totalSelisih);
 						}
 					}
 					chargeAmt = chargeAmt.abs();
@@ -680,6 +607,49 @@ public class SISGlobalExecute {
 			response = SISResponse.errorResponse(e.getMessage());
 		}
 		return response;
+	}
+	
+	public BigDecimal getTotalSortedType5(
+			LinkedHashMap<Integer, LinkedHashMap<String, BigDecimal>> mapData,
+			String keySort,
+			StringBuilder sbLog,
+			BigDecimal totalQty
+	) {
+		//sorting
+		LinkedHashMap<Integer, LinkedHashMap<String, BigDecimal>> mapDataSorted =
+			    mapData.entrySet()
+			        .stream()
+			        .sorted(Comparator.comparing(
+			            (Map.Entry<Integer, LinkedHashMap<String, BigDecimal>> e) ->
+			                e.getValue().getOrDefault(keySort, BigDecimal.ZERO)
+			        )
+//	        		.reversed()
+	        		)
+			        .collect(Collectors.toMap(
+			            Map.Entry::getKey,
+			            Map.Entry::getValue,
+			            (v1, v2) -> v1,
+			            LinkedHashMap::new
+			        ));
+		SISUtil.appendEnterSB(sbLog, "mapDataSorted: "+mapDataSorted.toString());
+		
+		BigDecimal sumQty = BigDecimal.ZERO;
+		BigDecimal totalSelisih = BigDecimal.ZERO;
+		for (Integer key: mapDataSorted.keySet()) {
+			LinkedHashMap<String, BigDecimal> mapAmt = mapDataSorted.get(key);
+			BigDecimal qty = mapAmt.get("qty");
+			if (qty.signum() >= 0) {
+				continue;
+			}
+			sumQty = sumQty.add(qty);
+			if (sumQty.compareTo(totalQty) < 0) {
+				break;
+			}
+			totalSelisih = totalSelisih.add(mapAmt.get("total_bruto"));
+		}
+		SISUtil.appendEnterSB(sbLog, "sumQty: "+SISUtil.getStringQty(sumQty));
+		SISUtil.appendEnterSB(sbLog, "totalSelisih: "+SISUtil.getStringQty(totalSelisih));
+		return totalSelisih;
 	}
 
 	//calculate MO
