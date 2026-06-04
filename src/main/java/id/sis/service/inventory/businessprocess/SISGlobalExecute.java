@@ -645,7 +645,7 @@ public class SISGlobalExecute {
 			if (sumQty.compareTo(totalQty) < 0) {
 				break;
 			}
-			totalSelisih = totalSelisih.add(mapAmt.get("total_bruto"));
+			totalSelisih = totalSelisih.add(mapAmt.get(keySort));
 		}
 		SISUtil.appendEnterSB(sbLog, "sumQty: "+SISUtil.getStringQty(sumQty));
 		SISUtil.appendEnterSB(sbLog, "totalSelisih: "+SISUtil.getStringQty(totalSelisih));
