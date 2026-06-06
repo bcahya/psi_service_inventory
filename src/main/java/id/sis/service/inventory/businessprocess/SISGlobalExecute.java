@@ -587,6 +587,10 @@ public class SISGlobalExecute {
 							totalSelisih = getTotalSortedType5(mapData, "total_netto", sbLog, totalQty);
 							chargeAmt = chargeAmt.add(totalSelisih);
 						}
+					} else {
+						if (totalAmt.signum() < 0) {
+							chargeAmt = totalAmt.multiply(new BigDecimal("0.5"));
+						}
 					}
 					chargeAmt = chargeAmt.abs();
 					SISUtil.appendEnterSB(sbLog, "chargeAmt: "+SISUtil.getStringQty(chargeAmt));
