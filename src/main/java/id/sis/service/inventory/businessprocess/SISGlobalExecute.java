@@ -1295,10 +1295,11 @@ public class SISGlobalExecute {
         Timestamp now = u.getCurrentTime();
         HashMap<String, Integer> mapCol = new HashMap<>();
         mapCol.put("wh", 0);
-        mapCol.put("price", 1);
-        mapCol.put("bp", 2);
-        mapCol.put("tax", 3);
-        mapCol.put("date", 4);
+        mapCol.put("dt", 1);
+        mapCol.put("price", 2);
+        mapCol.put("bp", 3);
+        mapCol.put("tax", 4);
+        mapCol.put("date", 5);
         try (BufferedReader br = new BufferedReader(new FileReader(csvFile))) {
             String headerLine = br.readLine();
             if (headerLine != null) {
@@ -1309,10 +1310,26 @@ public class SISGlobalExecute {
             while ((line = br.readLine()) != null) {
                 String[] values = line.split(csvDelimiter);
                 int whID = (int)u.getObject("m_warehouse", "value", "m_warehouse_id::int", values[mapCol.get("wh")]);
+                Object odtID = u.getObject("c_doctype", "name", "c_doctype_id::int", values[mapCol.get("dt")]);
+                if (odtID == null) {
+                	throw new Exception("c_doctype_id not found!");
+                }
+                int dtID = (int)odtID;
                 BigDecimal price = SISUtil.getBigDecimal(values[mapCol.get("price")]);
                 int bpID = (int)u.getObject("c_bpartner", "value", "c_bpartner_id::int", values[mapCol.get("bp")]);
                 int taxID = (int)u.getObject("c_tax", "name", "c_tax_id::int", values[mapCol.get("tax")]);
                 int bpLocID = (int)u.getObject("c_bpartner_location", "c_bpartner_id", "c_bpartner_location_id::int", bpID);
+                
+                Object oplID = u.getObject("c_bpartner", "po_pricelist_id", "c_bpartner_id::int", bpID);
+                if (oplID == null) {
+                	throw new Exception("po pricelist id not found on bp id "+bpID+"!");
+                }
+                int plID = (int)oplID;
+                Object optID = u.getObject("c_bpartner", "po_paymentterm_id", "c_bpartner_id::int", bpID);
+                if (optID == null) {
+                	throw new Exception("po paymentterm id not found on bp id "+bpID+"!");
+                }
+                int ptID = (int)optID;
                 int day = 0;
                 for (int a=mapCol.get("date"); a<values.length; a++) {
                 	day += 1;
@@ -1324,7 +1341,7 @@ public class SISGlobalExecute {
                 	
                 	BigDecimal qty = SISUtil.getBigDecimal(values[a]);
                     Timestamp dateordered = SISUtil.getTimestamp(date);
-                	int c_order_id = getOrderID(date, ad_org_id, sisIdProperties.getPo_doctype_id(), bpID, whID, "N");
+                	int c_order_id = getOrderID(date, ad_org_id, dtID, bpID, whID, "N");
                 	if (c_order_id <= 0) {
                 		docCount = docCount.add(new BigDecimal(1));
                 		c_order_id = u.getNextSysID("C_Order");
@@ -1371,7 +1388,7 @@ public class SISGlobalExecute {
                                 "N",
                                 "R",
                                 String.valueOf(docCount),
-                                sisIdProperties.getPo_doctype_id(),
+                                dtID,
                                 dateordered,
                                 dateordered,
                                 dateordered,
@@ -1381,7 +1398,7 @@ public class SISGlobalExecute {
                                 whID,
                                 "P",
                                 "5",
-                                sisIdProperties.getPo_pricelist_id(),
+                                plID,
                                 sisIdProperties.getC_currency_id(),
                                 sisIdProperties.getAd_user_id(),
                                 "B",
@@ -1391,7 +1408,7 @@ public class SISGlobalExecute {
                                 "DR",
                                 "CO",
                                 0,
-                                sisIdProperties.getPo_paymentterm_id(),
+                                ptID,
                                 UUID.randomUUID(),
                                 now,
                                 now,
@@ -1483,7 +1500,7 @@ public class SISGlobalExecute {
                 	}
                 }
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
 		return listID;
