@@ -1320,12 +1320,12 @@ public class SISGlobalExecute {
                 int taxID = (int)u.getObject("c_tax", "name", "c_tax_id::int", values[mapCol.get("tax")]);
                 int bpLocID = (int)u.getObject("c_bpartner_location", "c_bpartner_id", "c_bpartner_location_id::int", bpID);
                 
-                Object oplID = u.getObject("c_bpartner", "po_pricelist_id", "c_bpartner_id::int", bpID);
+                Object oplID = u.getObject("c_bpartner", "c_bpartner_id", "po_pricelist_id::int", bpID);
                 if (oplID == null) {
                 	throw new Exception("po pricelist id not found on bp id "+bpID+"!");
                 }
                 int plID = (int)oplID;
-                Object optID = u.getObject("c_bpartner", "po_paymentterm_id", "c_bpartner_id::int", bpID);
+                Object optID = u.getObject("c_bpartner", "c_bpartner_id", "po_paymentterm_id::int", bpID);
                 if (optID == null) {
                 	throw new Exception("po paymentterm id not found on bp id "+bpID+"!");
                 }
