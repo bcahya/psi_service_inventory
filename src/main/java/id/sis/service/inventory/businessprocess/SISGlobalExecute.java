@@ -1019,9 +1019,9 @@ public class SISGlobalExecute {
 					int seqMove = 99900;
 					RB_MOBOM bom = bu.getBOM(rbReq.getList_bom(), rbRL.getBom_id());
 					RB_MOWH whl = bu.getWarehouse(rbReq.getList_wh(), bom.getWarehouse_id());
-//					if (!bom.getBomtype().equalsIgnoreCase("SC")) {
-//						continue;
-//					}
+					if (!bom.getBomtype().equalsIgnoreCase("SC")) {
+						continue;
+					}
 					for (RB_MOBOMLine bl: bom.getList_line()) {
 						locSearchID = whl.getLocator_pre_id();
 						RB_MOProduct prd = bu.getProduct(rbReq.getList_product(), bl.getProduct_id());
@@ -1064,7 +1064,7 @@ public class SISGlobalExecute {
 								}
 							}
 								
-							if (!isMF) {
+//							if (!isMF) {
 								if (routing.getOperation_type().equalsIgnoreCase(SISConstants.MO_ROUTING_OPERATION_TAKEFROMSTOCK)
 										|| routing.getOperation_type().equalsIgnoreCase(SISConstants.MO_ROUTING_OPERATION_TAKEFROMSTOCKTRIGGERANOTHERRULE)) {
 									BigDecimal qtySOH = new BigDecimal(0);
@@ -1109,7 +1109,7 @@ public class SISGlobalExecute {
 									}
 									break;
 								}
-							}
+//							}
 							if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_MANUFACTURE)) {
 								LinkedHashMap<String, Object> mapPOP = new LinkedHashMap<String, Object>();
 								RB_MOBOM b = bu.getBOM(rbReq.getList_bom(), rbRL.getBom_id(), prd.getProduct_id());
