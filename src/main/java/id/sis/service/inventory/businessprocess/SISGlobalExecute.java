@@ -1019,9 +1019,9 @@ public class SISGlobalExecute {
 					int seqMove = 99900;
 					RB_MOBOM bom = bu.getBOM(rbReq.getList_bom(), rbRL.getBom_id());
 					RB_MOWH whl = bu.getWarehouse(rbReq.getList_wh(), bom.getWarehouse_id());
-					if (!bom.getBomtype().equalsIgnoreCase("SC")) {
-						continue;
-					}
+//					if (!bom.getBomtype().equalsIgnoreCase("SC")) {
+//						continue;
+//					}
 					for (RB_MOBOMLine bl: bom.getList_line()) {
 						locSearchID = whl.getLocator_pre_id();
 						RB_MOProduct prd = bu.getProduct(rbReq.getList_product(), bl.getProduct_id());
