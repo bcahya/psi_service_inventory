@@ -49,6 +49,7 @@ public class SISServiceImpl{
         return ex.calculateReqSubcont(param);
     }
 	
+	@Scheduled(cron = "0 */10 * * * *")
 	public SISResponse importTrans() throws Exception {
         logger.info("execute importTrans");
         return ex.importTrans();
