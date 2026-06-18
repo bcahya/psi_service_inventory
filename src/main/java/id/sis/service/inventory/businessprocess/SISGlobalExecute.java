@@ -1064,7 +1064,7 @@ public class SISGlobalExecute {
 								}
 							}
 								
-							if (!isMF) {
+//							if (!isMF) {
 								if (routing.getOperation_type().equalsIgnoreCase(SISConstants.MO_ROUTING_OPERATION_TAKEFROMSTOCK)
 										|| routing.getOperation_type().equalsIgnoreCase(SISConstants.MO_ROUTING_OPERATION_TAKEFROMSTOCKTRIGGERANOTHERRULE)) {
 									BigDecimal qtySOH = new BigDecimal(0);
@@ -1109,7 +1109,7 @@ public class SISGlobalExecute {
 									}
 									break;
 								}
-							}
+//							}
 							if (routing.getAction().equalsIgnoreCase(SISConstants.MO_ROUTING_ACTION_MANUFACTURE)) {
 								LinkedHashMap<String, Object> mapPOP = new LinkedHashMap<String, Object>();
 								RB_MOBOM b = bu.getBOM(rbReq.getList_bom(), rbRL.getBom_id(), prd.getProduct_id());
