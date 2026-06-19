@@ -1,8 +1,10 @@
 package id.sis.service.inventory.utils;
 
 import java.io.File;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -546,4 +548,27 @@ public class SISUtil {
     	}
     	return result;
     }
+	
+	public static void generateTxt(
+			String filePath,
+			String txt) {
+		Path path = Paths.get(filePath);
+		String[] txts = txt.split("\n");
+        try {
+			Files.write(
+			    path,
+			    Arrays.asList(txts),
+			    StandardCharsets.UTF_8
+			);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+	}
+	
+	public static String getStringTitleTimeStamp() {
+		SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
+		String result = sdf.format(new Date());
+		return result;
+	}
 }
