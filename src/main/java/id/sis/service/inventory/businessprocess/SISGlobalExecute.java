@@ -5,6 +5,9 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -1309,230 +1312,282 @@ public class SISGlobalExecute {
 	}
 	
 	BigDecimal docCount = SISUtil.getBigDecimal(u.getRefNoTime());
-	List<Integer> generatePO(String filePath){
-		u = new SISUtil(source, sisIdProperties, transactionManager);
+	List<Integer> generatePO(String filePath) throws Exception{
 		List<Integer> listID = new ArrayList<>();
-		String csvFile = filePath; // Ensure this file exists
-        String line = "";
-        String csvDelimiter = ","; // Use the correct delimiter
-        
-        String[] files = filePath.split("/");
-        String fileName = files[files.length-1].replace(".csv", "");
-        String[] fileNames = fileName.split("_");
-        int ad_org_id = (int)u.getObject("ad_org", "value", "ad_org_id::int", fileNames[0]);
-        int m_product_id = (int)u.getObject("m_product", "value", "m_product_id::int", fileNames[1]);
-        String period = (String)fileNames[2];
-        
-        Timestamp now = u.getCurrentTime();
-        HashMap<String, Integer> mapCol = new HashMap<>();
-        mapCol.put("wh", 0);
-        mapCol.put("dt", 1);
-        mapCol.put("price", 2);
-        mapCol.put("bp", 3);
-        mapCol.put("tax", 4);
-        mapCol.put("date", 5);
-        try (BufferedReader br = new BufferedReader(new FileReader(csvFile))) {
-            String headerLine = br.readLine();
-            if (headerLine != null) {
-                System.out.println("Headers: " + String.join(", ", headerLine.split(csvDelimiter)));
-            }
-            
-            // Read data lines
-            while ((line = br.readLine()) != null) {
-                String[] values = line.split(csvDelimiter);
-                int whID = (int)u.getObject("m_warehouse", "value", "m_warehouse_id::int", values[mapCol.get("wh")]);
-                Object odtID = u.getObject("c_doctype", "name", "c_doctype_id::int", values[mapCol.get("dt")]);
-                if (odtID == null) {
-                	throw new Exception("c_doctype_id not found!");
-                }
-                int dtID = (int)odtID;
-                BigDecimal price = SISUtil.getBigDecimal(values[mapCol.get("price")]);
-                int bpID = (int)u.getObject("c_bpartner", "value", "c_bpartner_id::int", values[mapCol.get("bp")]);
-                int taxID = (int)u.getObject("c_tax", "name", "c_tax_id::int", values[mapCol.get("tax")]);
-                int bpLocID = (int)u.getObject("c_bpartner_location", "c_bpartner_id", "c_bpartner_location_id::int", bpID);
-                
-                Object oplID = u.getObject("c_bpartner", "c_bpartner_id", "po_pricelist_id::int", bpID);
-                if (oplID == null) {
-                	throw new Exception("po pricelist id not found on bp id "+bpID+"!");
-                }
-                int plID = (int)oplID;
-                Object optID = u.getObject("c_bpartner", "c_bpartner_id", "po_paymentterm_id::int", bpID);
-                if (optID == null) {
-                	throw new Exception("po paymentterm id not found on bp id "+bpID+"!");
-                }
-                int ptID = (int)optID;
-                int day = 0;
-                for (int a=mapCol.get("date"); a<values.length; a++) {
-                	day += 1;
-                	String date = period + SISUtil.addZero(day, 2);
-                	if (values[a] == null
-                			|| values[a].equalsIgnoreCase("")) {
-                		continue;
-                	}
-                	
-                	BigDecimal qty = SISUtil.getBigDecimal(values[a]);
-                    Timestamp dateordered = SISUtil.getTimestamp(date);
-                	int c_order_id = getOrderID(date, ad_org_id, dtID, bpID, whID, "N");
-                	if (c_order_id <= 0) {
-                		docCount = docCount.add(new BigDecimal(1));
-                		c_order_id = u.getNextSysID("C_Order");
-    	            	sql =
-                    		"insert into c_order ( "
-                    		+ "	c_order_id, "
-                    		+ "	ad_client_id, "
-                    		+ "	ad_org_id, "
-                    		+ "	issotrx, "
-                    		+ "	sis_status_docno, "
-                    		+ "	documentno, "
-                    		+ "	c_doctypetarget_id, "
-                    		+ "	dateacct, "
-                    		+ "	dateordered, "
-                    		+ "	datepromised, "
-                    		+ "	c_bpartner_id, "
-                    		+ "	c_bpartner_location_id, "
-                    		+ "	ad_user_id, "
-                    		+ "	m_warehouse_id, "
-                    		+ "	deliveryviarule, "
-                    		+ "	priorityrule, "
-                    		+ "	m_pricelist_id, "
-                    		+ "	c_currency_id, "
-                    		+ "	salesrep_id, "
-                    		+ "	paymentrule, "
-                    		+ "	invoicerule, "
-                    		+ "	deliveryrule, "
-                    		+ "	freightcostrule, "
-                    		+ "	docstatus, "
-                    		+ "	docaction, "
-                    		+ "	c_doctype_id, "
-                    		+ "	c_paymentterm_id, "
-                    		+ "	c_order_uu, "
-                    		+ "	created, "
-                    		+ "	updated, "
-                    		+ "	createdby, "
-                    		+ "	updatedby "
-                    		+ ") values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ";
-                        int rowsAffected = source.update(
-                                sql, 
-                                c_order_id, 
-                                sisIdProperties.getAd_client_id(), 
-                                ad_org_id, 
-                                "N",
-                                "R",
-                                String.valueOf(docCount),
-                                dtID,
-                                dateordered,
-                                dateordered,
-                                dateordered,
-                                bpID,
-                                bpLocID,
-                                sisIdProperties.getAd_user_id(),
-                                whID,
-                                "P",
-                                "5",
-                                plID,
-                                sisIdProperties.getC_currency_id(),
-                                sisIdProperties.getAd_user_id(),
-                                "B",
-                                "D",
-                                "A",
-                                "I",
-                                "DR",
-                                "CO",
-                                0,
-                                ptID,
-                                UUID.randomUUID(),
-                                now,
-                                now,
-                                sisIdProperties.getAd_user_id(),
-                                sisIdProperties.getAd_user_id()
-                            );
-                	}
-                	
-                	int c_orderline_id = getOrderLineID(c_order_id, m_product_id);
-                	if (c_orderline_id <= 0) {
-                		if (!listID.contains(c_order_id)) {
-                			listID.add(c_order_id);
-                		}
-                    	int lineNo = ((int)u.getObject("c_orderline", "c_order_id", "coalesce((max(line)),0)::int lineno", c_order_id))+10;
-                    	int c_uom_id = (int)u.getObject("m_product", "m_product_id", "c_uom_id::int", m_product_id);
-                		c_orderline_id = u.getNextSysID("C_OrderLine");
-    	            	sql =
-                    		"insert into c_orderline ( "
-                    		+ "	c_orderline_id, "
-                    		+ "	ad_client_id, "
-                    		+ "	ad_org_id, "
-                    		+ "	c_order_id, "
-                    		+ "	c_bpartner_id, "
-                    		+ "	c_bpartner_location_id, "
-                    		+ "	datepromised, "
-                    		+ "	dateordered, "
-                    		+ "	line, "
-                    		+ "	m_product_id, "
-                    		+ "	qtyentered, "
-                    		+ "	c_uom_id, "
-                    		+ "	qtyordered, "
-                    		+ "	priceentered, "
-                    		+ "	priceactual, "
-                    		+ "	c_tax_id, "
-                    		+ "	m_warehouse_id, "
-                    		+ "	c_currency_id, "
-                    		+ "	linenetamt, "
-                    		+ "	c_orderline_uu, "
-                    		+ "	created, "
-                    		+ "	updated, "
-                    		+ "	createdby, "
-                    		+ "	updatedby "
-                    		+ ") values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ";
-                        int rowsAffected = source.update(
-                                sql, 
-                                c_orderline_id, 
-                                sisIdProperties.getAd_client_id(), 
-                                ad_org_id, 
-                                c_order_id,
-                                bpID,
-                                bpLocID,
-                                dateordered,
-                                dateordered,
-                                lineNo,
-                                m_product_id,
-                                qty,
-                                c_uom_id,
-                                qty,
-                                price,
-                                price,
-                                taxID,
-                                whID,
-                                sisIdProperties.getC_currency_id(),
-                                qty.multiply(price),
-                                UUID.randomUUID(),
-                                now,
-                                now,
-                                sisIdProperties.getAd_user_id(),
-                                sisIdProperties.getAd_user_id()
-                            );
-                	} else {
-                		sql =
-            				"update c_orderline "
-            				+ "	set c_tax_id=?, "
-            				+ "	priceentered=?, "
-            				+ "	priceactual=?, "
-            				+ "	qtyentered=?, "
-            				+ "	qtyordered=? "
-            				+ "where c_orderline_id=? ";
-                		int rowsAffected = source.update(
-                                sql,
-                                taxID,
-                                price,
-                                price,
-                                qty,
-                                qty,
-                                c_orderline_id
-                        );
-                	}
-                }
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
+		try {
+			if (!filePath.endsWith(".csv")) {
+	        	throw new Exception("Please upload csv only!");
+	        }
+			u = new SISUtil(source, sisIdProperties, transactionManager);
+			String csvFile = filePath; // Ensure this file exists
+	        String line = "";
+	        String csvDelimiter = ","; // Use the correct delimiter
+	        
+	        String[] files = filePath.split("/");
+	        String fileName = files[files.length-1].replace(".csv", "");
+	        String[] fileNames = fileName.split("_");
+	        int ad_org_id = SISUtil.getIntObject(u.getObject("ad_org", "value", "ad_org_id::int", fileNames[0]));
+	        if (ad_org_id <= 0) {
+	        	throw new Exception("Org not found!");
+	        }
+	        int m_product_id = SISUtil.getIntObject(u.getObject("m_product", "value", "m_product_id::int", fileNames[1]));
+	        if (m_product_id <= 0) {
+	        	throw new Exception("Product not found!");
+	        }
+	        String period = (String)fileNames[2];
+	        if (period.length() != 6) {
+	        	throw new Exception("Period must be 6 digit character!");
+	        }
+	        
+	        Timestamp now = u.getCurrentTime();
+	        HashMap<String, Integer> mapCol = new HashMap<>();
+	        mapCol.put("wh", 0);
+	        mapCol.put("dt", 1);
+	        mapCol.put("price", 2);
+	        mapCol.put("bp", 3);
+	        mapCol.put("tax", 4);
+	        mapCol.put("date", 5);
+	        try (BufferedReader br = new BufferedReader(new FileReader(csvFile))) {
+	            String headerLine = br.readLine();
+	            if (headerLine != null) {
+	                System.out.println("Headers: " + String.join(", ", headerLine.split(csvDelimiter)));
+	            }
+	            
+	            // Read data lines
+	            int totalCol = 0;
+	            int row = 0;
+	            while ((line = br.readLine()) != null) {
+	            	row += 1;
+	                String[] values = line.split(csvDelimiter);
+	                if (totalCol == 0) {
+	                	totalCol = values.length;
+	                }
+	                if (totalCol != values.length) {
+	                	throw new Exception("Total column row "+row+" different!");
+	                }
+	                int whID = (int)u.getObject("m_warehouse", "value", "m_warehouse_id::int", values[mapCol.get("wh")]);
+	                Object odtID = u.getObject("c_doctype", "name", "c_doctype_id::int", values[mapCol.get("dt")]);
+	                if (odtID == null) {
+	                	throw new Exception("row "+row+", c_doctype_id not found!");
+	                }
+	                int dtID = (int)odtID;
+	                BigDecimal price = SISUtil.getBigDecimal(values[mapCol.get("price")]);
+	                int bpID = SISUtil.getIntObject(u.getObject("c_bpartner", "value", "c_bpartner_id::int", values[mapCol.get("bp")]));
+	                if (bpID <= 0) {
+	                	throw new Exception("row "+row+", BP not found!");
+	                }
+	                int taxID = SISUtil.getIntObject(u.getObject("c_tax", "name", "c_tax_id::int", values[mapCol.get("tax")]));
+	                if (taxID <= 0) {
+	                	throw new Exception("row "+row+", Tax not found!");
+	                }
+	                int bpLocID = SISUtil.getIntObject(u.getObject("c_bpartner_location", "c_bpartner_id", "c_bpartner_location_id::int", bpID));
+	                if (bpLocID <= 0) {
+	                	throw new Exception("row "+row+", BP Location not found!");
+	                }
+	                
+	                Object oplID = u.getObject("c_bpartner", "c_bpartner_id", "po_pricelist_id::int", bpID);
+	                if (oplID == null) {
+	                	throw new Exception("row "+row+", po pricelist id not found on bp id "+bpID+"!");
+	                }
+	                int plID = (int)oplID;
+	                Object optID = u.getObject("c_bpartner", "c_bpartner_id", "po_paymentterm_id::int", bpID);
+	                if (optID == null) {
+	                	throw new Exception("row "+row+", po paymentterm id not found on bp id "+bpID+"!");
+	                }
+	                int ptID = (int)optID;
+	                int day = 0;
+	                for (int a=mapCol.get("date"); a<values.length; a++) {
+	                	day += 1;
+	                	String days = SISUtil.addZero(day, 2);
+	                	String date = period + days;
+	                	if (values[a] == null
+	                			|| values[a].equalsIgnoreCase("")) {
+	                		continue;
+	                	}
+	                	BigDecimal qty = BigDecimal.ZERO;
+	                	try {
+                    		qty = SISUtil.getBigDecimal(values[a]);
+                    	} catch (Exception e) {
+							throw new Exception("row "+row+", date "+days+", Qty harus angka dan bulat!");
+						}
+                    	if (qty.signum() <= 0) {
+                    		throw new Exception("row "+row+", date "+days+", Qty <= 0!");
+                    	}
+	                	Timestamp dateordered = SISUtil.getTimestamp(date);
+	                	int c_order_id = getOrderID(date, ad_org_id, dtID, bpID, whID, "N");
+	                	if (c_order_id <= 0) {
+	                		docCount = docCount.add(new BigDecimal(1));
+	                		c_order_id = u.getNextSysID("C_Order");
+	    	            	sql =
+	                    		"insert into c_order ( "
+	                    		+ "	c_order_id, "
+	                    		+ "	ad_client_id, "
+	                    		+ "	ad_org_id, "
+	                    		+ "	issotrx, "
+	                    		+ "	sis_status_docno, "
+	                    		+ "	documentno, "
+	                    		+ "	c_doctypetarget_id, "
+	                    		+ "	dateacct, "
+	                    		+ "	dateordered, "
+	                    		+ "	datepromised, "
+	                    		+ "	c_bpartner_id, "
+	                    		+ "	c_bpartner_location_id, "
+	                    		+ "	ad_user_id, "
+	                    		+ "	m_warehouse_id, "
+	                    		+ "	deliveryviarule, "
+	                    		+ "	priorityrule, "
+	                    		+ "	m_pricelist_id, "
+	                    		+ "	c_currency_id, "
+	                    		+ "	salesrep_id, "
+	                    		+ "	paymentrule, "
+	                    		+ "	invoicerule, "
+	                    		+ "	deliveryrule, "
+	                    		+ "	freightcostrule, "
+	                    		+ "	docstatus, "
+	                    		+ "	docaction, "
+	                    		+ "	c_doctype_id, "
+	                    		+ "	c_paymentterm_id, "
+	                    		+ "	c_order_uu, "
+	                    		+ "	created, "
+	                    		+ "	updated, "
+	                    		+ "	createdby, "
+	                    		+ "	updatedby "
+	                    		+ ") values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ";
+	                        int rowsAffected = source.update(
+	                                sql, 
+	                                c_order_id, 
+	                                sisIdProperties.getAd_client_id(), 
+	                                ad_org_id, 
+	                                "N",
+	                                "R",
+	                                String.valueOf(docCount),
+	                                dtID,
+	                                dateordered,
+	                                dateordered,
+	                                dateordered,
+	                                bpID,
+	                                bpLocID,
+	                                sisIdProperties.getAd_user_id(),
+	                                whID,
+	                                "P",
+	                                "5",
+	                                plID,
+	                                sisIdProperties.getC_currency_id(),
+	                                sisIdProperties.getAd_user_id(),
+	                                "B",
+	                                "D",
+	                                "A",
+	                                "I",
+	                                "DR",
+	                                "CO",
+	                                0,
+	                                ptID,
+	                                UUID.randomUUID(),
+	                                now,
+	                                now,
+	                                sisIdProperties.getAd_user_id(),
+	                                sisIdProperties.getAd_user_id()
+	                            );
+	                	}
+	                	
+	                	int c_orderline_id = getOrderLineID(c_order_id, m_product_id);
+	                	if (c_orderline_id <= 0) {
+	                		if (!listID.contains(c_order_id)) {
+	                			listID.add(c_order_id);
+	                		}
+	                    	int lineNo = ((int)u.getObject("c_orderline", "c_order_id", "coalesce((max(line)),0)::int lineno", c_order_id))+10;
+	                    	int c_uom_id = (int)u.getObject("m_product", "m_product_id", "c_uom_id::int", m_product_id);
+	                		c_orderline_id = u.getNextSysID("C_OrderLine");
+	    	            	sql =
+	                    		"insert into c_orderline ( "
+	                    		+ "	c_orderline_id, "
+	                    		+ "	ad_client_id, "
+	                    		+ "	ad_org_id, "
+	                    		+ "	c_order_id, "
+	                    		+ "	c_bpartner_id, "
+	                    		+ "	c_bpartner_location_id, "
+	                    		+ "	datepromised, "
+	                    		+ "	dateordered, "
+	                    		+ "	line, "
+	                    		+ "	m_product_id, "
+	                    		+ "	qtyentered, "
+	                    		+ "	c_uom_id, "
+	                    		+ "	qtyordered, "
+	                    		+ "	priceentered, "
+	                    		+ "	priceactual, "
+	                    		+ "	c_tax_id, "
+	                    		+ "	m_warehouse_id, "
+	                    		+ "	c_currency_id, "
+	                    		+ "	linenetamt, "
+	                    		+ "	c_orderline_uu, "
+	                    		+ "	created, "
+	                    		+ "	updated, "
+	                    		+ "	createdby, "
+	                    		+ "	updatedby "
+	                    		+ ") values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ";
+	                        int rowsAffected = source.update(
+	                                sql, 
+	                                c_orderline_id, 
+	                                sisIdProperties.getAd_client_id(), 
+	                                ad_org_id, 
+	                                c_order_id,
+	                                bpID,
+	                                bpLocID,
+	                                dateordered,
+	                                dateordered,
+	                                lineNo,
+	                                m_product_id,
+	                                qty,
+	                                c_uom_id,
+	                                qty,
+	                                price,
+	                                price,
+	                                taxID,
+	                                whID,
+	                                sisIdProperties.getC_currency_id(),
+	                                qty.multiply(price),
+	                                UUID.randomUUID(),
+	                                now,
+	                                now,
+	                                sisIdProperties.getAd_user_id(),
+	                                sisIdProperties.getAd_user_id()
+	                            );
+	                	} else {
+	                		sql =
+	            				"update c_orderline "
+	            				+ "	set c_tax_id=?, "
+	            				+ "	priceentered=?, "
+	            				+ "	priceactual=?, "
+	            				+ "	qtyentered=?, "
+	            				+ "	qtyordered=? "
+	            				+ "where c_orderline_id=? ";
+	                		int rowsAffected = source.update(
+	                                sql,
+	                                taxID,
+	                                price,
+	                                price,
+	                                qty,
+	                                qty,
+	                                c_orderline_id
+	                        );
+	                	}
+	                }
+	            }
+	        } catch (Exception e) {
+	            throw new Exception(e.getMessage());
+	        }
+		} catch (Exception e) {
+            logger.warn(e.getMessage());
+            String dirError = sisIdProperties.getDir_po()+"error/";
+	        Path errorPath = Paths.get(dirError);
+	        try {
+				Files.createDirectories(errorPath);
+			} catch (IOException e1) {
+				e1.printStackTrace();
+			}
+            String fp = dirError+SISUtil.getStringTitleTimeStamp()+".txt";
+            SISUtil.generateTxt(fp, e.getMessage());
+            throw new Exception(e.getMessage());
         }
 		return listID;
 	}
