@@ -1330,10 +1330,6 @@ public class SISGlobalExecute {
 	        if (ad_org_id <= 0) {
 	        	throw new Exception("Org not found!");
 	        }
-	        int m_product_id = SISUtil.getIntObject(u.getObject("m_product", "value", "m_product_id::int", fileNames[1]));
-	        if (m_product_id <= 0) {
-	        	throw new Exception("Product not found!");
-	        }
 	        String period = (String)fileNames[2];
 	        if (period.length() != 6) {
 	        	throw new Exception("Period must be 6 digit character!");
@@ -1343,10 +1339,11 @@ public class SISGlobalExecute {
 	        HashMap<String, Integer> mapCol = new HashMap<>();
 	        mapCol.put("wh", 0);
 	        mapCol.put("dt", 1);
-	        mapCol.put("price", 2);
-	        mapCol.put("bp", 3);
-	        mapCol.put("tax", 4);
-	        mapCol.put("date", 5);
+	        mapCol.put("product", 2);
+	        mapCol.put("price", 3);
+	        mapCol.put("bp", 4);
+	        mapCol.put("tax", 5);
+	        mapCol.put("date", 6);
 	        try (BufferedReader br = new BufferedReader(new FileReader(csvFile))) {
 	            String headerLine = br.readLine();
 	            if (headerLine != null) {
@@ -1371,7 +1368,11 @@ public class SISGlobalExecute {
 	                	throw new Exception("row "+row+", c_doctype_id not found!");
 	                }
 	                int dtID = (int)odtID;
-	                BigDecimal price = SISUtil.getBigDecimal(values[mapCol.get("price")]);
+	                int m_product_id = SISUtil.getIntObject(u.getObject("m_product", "value", "m_product_id::int", values[mapCol.get("product")]));
+	    	        if (m_product_id <= 0) {
+	    	        	throw new Exception("Product not found!");
+	    	        }
+	    	        BigDecimal price = SISUtil.getBigDecimal(values[mapCol.get("price")]);
 	                int bpID = SISUtil.getIntObject(u.getObject("c_bpartner", "value", "c_bpartner_id::int", values[mapCol.get("bp")]));
 	                if (bpID <= 0) {
 	                	throw new Exception("row "+row+", BP not found!");
