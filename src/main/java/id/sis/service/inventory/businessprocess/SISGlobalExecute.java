@@ -1289,17 +1289,17 @@ public class SISGlobalExecute {
         String fileName = files[files.length-1].replace(".csv", "");
         String[] fileNames = fileName.split("_");
         int ad_org_id = (int)u.getObject("ad_org", "value", "ad_org_id::int", fileNames[0]);
-        int m_product_id = (int)u.getObject("m_product", "value", "m_product_id::int", fileNames[1]);
-        String period = (String)fileNames[2];
+        String period = (String)fileNames[1];
         
         Timestamp now = u.getCurrentTime();
         HashMap<String, Integer> mapCol = new HashMap<>();
         mapCol.put("wh", 0);
         mapCol.put("dt", 1);
-        mapCol.put("price", 2);
-        mapCol.put("bp", 3);
-        mapCol.put("tax", 4);
-        mapCol.put("date", 5);
+        mapCol.put("product", 2);
+        mapCol.put("price", 3);
+        mapCol.put("bp", 4);
+        mapCol.put("tax", 5);
+        mapCol.put("date", 6);
         try (BufferedReader br = new BufferedReader(new FileReader(csvFile))) {
             String headerLine = br.readLine();
             if (headerLine != null) {
@@ -1315,6 +1315,7 @@ public class SISGlobalExecute {
                 	throw new Exception("c_doctype_id not found!");
                 }
                 int dtID = (int)odtID;
+                int m_product_id = (int)u.getObject("m_product", "value", "m_product_id::int", values[mapCol.get("product")]);
                 BigDecimal price = SISUtil.getBigDecimal(values[mapCol.get("price")]);
                 int bpID = (int)u.getObject("c_bpartner", "value", "c_bpartner_id::int", values[mapCol.get("bp")]);
                 int taxID = (int)u.getObject("c_tax", "name", "c_tax_id::int", values[mapCol.get("tax")]);
