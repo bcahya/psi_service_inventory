@@ -1330,7 +1330,7 @@ public class SISGlobalExecute {
 	        if (ad_org_id <= 0) {
 	        	throw new Exception("Org not found!");
 	        }
-	        String period = (String)fileNames[2];
+	        String period = (String)fileNames[1];
 	        if (period.length() != 6) {
 	        	throw new Exception("Period must be 6 digit character!");
 	        }
@@ -1370,7 +1370,7 @@ public class SISGlobalExecute {
 	                int dtID = (int)odtID;
 	                int m_product_id = SISUtil.getIntObject(u.getObject("m_product", "value", "m_product_id::int", values[mapCol.get("product")]));
 	    	        if (m_product_id <= 0) {
-	    	        	throw new Exception("Product not found!");
+	    	        	throw new Exception("row "+row+", Product not found!");
 	    	        }
 	    	        BigDecimal price = SISUtil.getBigDecimal(values[mapCol.get("price")]);
 	                int bpID = SISUtil.getIntObject(u.getObject("c_bpartner", "value", "c_bpartner_id::int", values[mapCol.get("bp")]));
