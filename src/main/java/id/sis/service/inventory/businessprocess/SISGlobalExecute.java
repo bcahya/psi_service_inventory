@@ -1560,7 +1560,8 @@ public class SISGlobalExecute {
 	            				+ "	priceentered=?, "
 	            				+ "	priceactual=?, "
 	            				+ "	qtyentered=?, "
-	            				+ "	qtyordered=? "
+	            				+ "	qtyordered=?, "
+	            				+ "	linenetamt=? "
 	            				+ "where c_orderline_id=? ";
 	                		int rowsAffected = source.update(
 	                                sql,
@@ -1569,10 +1570,49 @@ public class SISGlobalExecute {
 	                                price,
 	                                qty,
 	                                qty,
+	                                qty.multiply(price),
 	                                c_orderline_id
 	                        );
 	                	}
 	                }
+	            }
+	            for (int id: listID) {
+	            	sql =
+        				"with t1 as ( "
+        				+ "	select "
+        				+ "		ol.c_order_id, "
+        				+ "		sum( "
+        				+ "			case  "
+        				+ "				when pl.istaxincluded = 'Y' "
+        				+ "				then ol.linenetamt - sis_gettaxamt(ol.c_tax_id, ol.linenetamt, pl.istaxincluded) "
+        				+ "				else ol.linenetamt "
+        				+ "			end "
+        				+ "		) totallines, "
+        				+ "		sum( "
+        				+ "			case  "
+        				+ "				when pl.istaxincluded = 'Y' "
+        				+ "				then ol.linenetamt "
+        				+ "				else ol.linenetamt + sis_gettaxamt(ol.c_tax_id, ol.linenetamt, pl.istaxincluded) "
+        				+ "			end "
+        				+ "		) grandtotal "
+        				+ "	from c_orderline ol "
+        				+ "	inner join c_order o "
+        				+ "		on o.c_order_id = ol.c_order_id "
+        				+ "	inner join m_pricelist pl "
+        				+ "		on pl.m_pricelist_id = o.m_pricelist_id "
+        				+ "	where ol.c_order_id = ? "
+        				+ "	and ol.isactive = 'Y' "
+        				+ "	group by ol.c_order_id "
+        				+ ") "
+        				+ "update c_order "
+        				+ "	set totallines = t1.totallines, "
+        				+ "	grandtotal = t1.grandtotal "
+        				+ "from t1 "
+        				+ "where t1.c_order_id = c_order.c_order_id ";
+            		int rowsAffected = source.update(
+                            sql,
+                            id
+                    );
 	            }
 	        } catch (Exception e) {
 	            throw new Exception(e.getMessage());
